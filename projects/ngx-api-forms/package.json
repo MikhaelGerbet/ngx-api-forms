@@ -1,0 +1,43 @@
+{
+  "name": "ngx-api-forms",
+  "version": "1.0.0",
+  "description": "Bridge your API validation errors to Angular Reactive Forms — automatically. Supports NestJS/class-validator, Zod, Laravel, Django REST and custom backends.",
+  "keywords": [
+    "angular",
+    "forms",
+    "api",
+    "validation",
+    "error-handling",
+    "nestjs",
+    "class-validator",
+    "reactive-forms",
+    "form-helper",
+    "ng",
+    "ngx",
+    "i18n",
+    "ssr"
+  ],
+  "author": {
+    "name": "Mikhaël GERBET",
+    "email": "frollon.noir@gmail.com",
+    "url": "https://github.com/MikhaelGerbet"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MikhaelGerbet/ngx-api-forms.git"
+  },
+  "bugs": {
+    "url": "https://github.com/MikhaelGerbet/ngx-api-forms/issues"
+  },
+  "homepage": "https://github.com/MikhaelGerbet/ngx-api-forms#readme",
+  "peerDependencies": {
+    "@angular/common": "^17.0.0 || ^18.0.0 || ^19.0.0 || ^20.0.0",
+    "@angular/core": "^17.0.0 || ^18.0.0 || ^19.0.0 || ^20.0.0",
+    "@angular/forms": "^17.0.0 || ^18.0.0 || ^19.0.0 || ^20.0.0"
+  },
+  "dependencies": {
+    "tslib": "^2.3.0"
+  },
+  "sideEffects": false
+}

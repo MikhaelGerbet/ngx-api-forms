@@ -1,0 +1,120 @@
+/**
+ * Laravel validation error preset.
+ *
+ * Parses the standard Laravel validation error format:
+ * ```json
+ * {
+ *   "message": "The given data was invalid.",
+ *   "errors": {
+ *     "email": ["The email field is required.", "The email must be a valid email address."],
+ *     "name": ["The name must be at least 3 characters."]
+ *   }
+ * }
+ * ```
+ */
+import { ApiFieldError, ErrorPreset, LaravelValidationErrors } from '../models/api-forms.models';
+
+function inferConstraint(message: string): string {
+  const lower = message.toLowerCase();
+
+  if (lower.includes('is required') || lower.includes('field is required')) return 'required';
+  if (lower.includes('must be a valid email')) return 'email';
+  if (lower.includes('must be at least') && lower.includes('character')) return 'minlength';
+  if (lower.includes('must not be greater than') && lower.includes('character')) return 'maxlength';
+  if (lower.includes('must be at least')) return 'min';
+  if (lower.includes('must not be greater than')) return 'max';
+  if (lower.includes('must be a number')) return 'number';
+  if (lower.includes('must be an integer')) return 'integer';
+  if (lower.includes('must be a date')) return 'date';
+  if (lower.includes('must be a valid url')) return 'url';
+  if (lower.includes('has already been taken')) return 'unique';
+  if (lower.includes('must match')) return 'pattern';
+  if (lower.includes('must be a valid phone')) return 'phone';
+  if (lower.includes('format is invalid')) return 'invalid';
+  if (lower.includes('must be accepted')) return 'accepted';
+  if (lower.includes('confirmation does not match')) return 'confirmed';
+  if (lower.includes('must be a file')) return 'file';
+  if (lower.includes('must be an image')) return 'image';
+
+  return 'invalid';
+}
+
+/**
+ * Creates a Laravel validation error preset.
+ *
+ * @example
+ * ```typescript
+ * import { laravelPreset } from 'ngx-api-forms';
+ *
+ * const bridge = createFormBridge(form, {
+ *   preset: laravelPreset()
+ * });
+ * ```
+ */
+export function laravelPreset(): ErrorPreset {
+  return {
+    name: 'laravel',
+    parse(error: unknown): ApiFieldError[] {
+      if (!error || typeof error !== 'object') return [];
+
+      const err = error as Record<string, unknown>;
+
+      // Standard Laravel format: { errors: { field: [messages] } }
+      let errors: LaravelValidationErrors | undefined;
+
+      if (err['errors'] && typeof err['errors'] === 'object') {
+        errors = err['errors'] as LaravelValidationErrors;
+      }
+      // Direct format: { field: [messages] } (without wrapper)
+      else if (!err['statusCode'] && !err['message']) {
+        errors = err as unknown as LaravelValidationErrors;
+      }
+
+      if (!errors) return [];
+
+      const result: ApiFieldError[] = [];
+
+      for (const [field, messages] of Object.entries(errors)) {
+        if (!Array.isArray(messages)) continue;
+
+        // Laravel uses dot notation for nested fields (e.g. 'address.city')
+        const normalizedField = field.replace(/\.\*/g, '').replace(/\.\d+\./g, '.');
+
+        for (const message of messages) {
+          if (typeof message !== 'string') continue;
+          result.push({
+            field: normalizedField,
+            constraint: inferConstraint(message),
+            message,
+          });
+        }
+      }
+
+      return result;
+    },
+  };
+}
+
+/**
+ * Default constraint map for Laravel.
+ */
+export const LARAVEL_CONSTRAINT_MAP: Record<string, string> = {
+  required: 'required',
+  email: 'email',
+  minlength: 'minlength',
+  maxlength: 'maxlength',
+  min: 'min',
+  max: 'max',
+  number: 'number',
+  integer: 'integer',
+  date: 'date',
+  url: 'url',
+  unique: 'unique',
+  pattern: 'pattern',
+  phone: 'phone',
+  invalid: 'invalid',
+  accepted: 'accepted',
+  confirmed: 'confirmed',
+  file: 'file',
+  image: 'image',
+};

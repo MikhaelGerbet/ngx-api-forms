@@ -1,0 +1,146 @@
+/**
+ * Zod error preset.
+ *
+ * Parses errors from `ZodError.flatten()`:
+ * ```json
+ * {
+ *   "formErrors": [],
+ *   "fieldErrors": {
+ *     "email": ["Invalid email"],
+ *     "name": ["String must contain at least 3 character(s)"]
+ *   }
+ * }
+ * ```
+ *
+ * Also supports raw `ZodError.issues`:
+ * ```json
+ * [
+ *   { "code": "too_small", "minimum": 3, "path": ["name"], "message": "..." },
+ *   { "code": "invalid_string", "validation": "email", "path": ["email"], "message": "..." }
+ * ]
+ * ```
+ */
+import { ApiFieldError, ErrorPreset, ZodFlatError } from '../models/api-forms.models';
+
+interface ZodIssue {
+  code: string;
+  path: (string | number)[];
+  message: string;
+  minimum?: number;
+  maximum?: number;
+  validation?: string;
+}
+
+function zodCodeToConstraint(issue: ZodIssue): string {
+  switch (issue.code) {
+    case 'too_small':
+      return issue.minimum !== undefined ? 'minlength' : 'min';
+    case 'too_big':
+      return issue.maximum !== undefined ? 'maxlength' : 'max';
+    case 'invalid_string':
+      return issue.validation ?? 'invalid';
+    case 'invalid_type':
+      return 'required';
+    case 'invalid_enum_value':
+      return 'enum';
+    case 'invalid_date':
+      return 'date';
+    case 'custom':
+      return 'custom';
+    default:
+      return 'invalid';
+  }
+}
+
+/**
+ * Creates a Zod error preset.
+ *
+ * Supports both `.flatten()` and raw `.issues` formats.
+ *
+ * @example
+ * ```typescript
+ * import { zodPreset } from 'ngx-api-forms';
+ *
+ * const bridge = createFormBridge(form, {
+ *   preset: zodPreset()
+ * });
+ * ```
+ */
+export function zodPreset(): ErrorPreset {
+  return {
+    name: 'zod',
+    parse(error: unknown): ApiFieldError[] {
+      if (!error || typeof error !== 'object') return [];
+
+      // Format 1: Flattened error { fieldErrors: { ... } }
+      const flat = error as Partial<ZodFlatError>;
+      if (flat.fieldErrors && typeof flat.fieldErrors === 'object') {
+        const result: ApiFieldError[] = [];
+        for (const [field, messages] of Object.entries(flat.fieldErrors)) {
+          if (!Array.isArray(messages)) continue;
+          for (const message of messages) {
+            if (typeof message !== 'string') continue;
+            result.push({ field, constraint: 'invalid', message });
+          }
+        }
+        return result;
+      }
+
+      // Format 2: Raw issues array
+      const err = error as Record<string, unknown>;
+      if (Array.isArray(err['issues'])) {
+        const issues = err['issues'] as ZodIssue[];
+        return issues
+          .filter((issue) => issue.path && issue.path.length > 0)
+          .map((issue) => ({
+            field: issue.path.map(String).join('.'),
+            constraint: zodCodeToConstraint(issue),
+            message: issue.message,
+          }));
+      }
+
+      // Format 3: Direct array of issues
+      if (Array.isArray(error)) {
+        const issues = error as ZodIssue[];
+        if (issues.length > 0 && 'code' in issues[0] && 'path' in issues[0]) {
+          return issues
+            .filter((issue) => issue.path && issue.path.length > 0)
+            .map((issue) => ({
+              field: issue.path.map(String).join('.'),
+              constraint: zodCodeToConstraint(issue),
+              message: issue.message,
+            }));
+        }
+      }
+
+      // Format 4: Wrapped { errors: { fieldErrors: {...} } } or { error: {...} }
+      if (err['errors'] && typeof err['errors'] === 'object') {
+        const nested = err['errors'] as Partial<ZodFlatError>;
+        if (nested.fieldErrors) {
+          return zodPreset().parse(nested);
+        }
+      }
+
+      return [];
+    },
+  };
+}
+
+/**
+ * Default constraint map for Zod.
+ */
+export const ZOD_CONSTRAINT_MAP: Record<string, string> = {
+  required: 'required',
+  email: 'email',
+  url: 'url',
+  uuid: 'uuid',
+  minlength: 'minlength',
+  maxlength: 'maxlength',
+  min: 'min',
+  max: 'max',
+  regex: 'pattern',
+  enum: 'enum',
+  date: 'date',
+  custom: 'custom',
+  invalid: 'invalid',
+};

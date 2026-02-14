@@ -1,0 +1,458 @@
+// GitHub Corner
+.github-corner:hover .octo-arm {
+  animation: octocat-wave 560ms ease-in-out;
+}
+@keyframes octocat-wave {
+  0%, 100% { transform: rotate(0); }
+  20%, 60% { transform: rotate(-25deg); }
+  40%, 80% { transform: rotate(10deg); }
+}
+
+.demo-container {
+  min-height: 100vh;
+  padding: 40px 20px;
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+}
+
+// Header
+.demo-header {
+  text-align: center;
+  margin-bottom: 48px;
+
+  h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 8px;
+  }
+
+  .tagline {
+    font-size: 1.1rem;
+    color: #64748b;
+    margin-bottom: 16px;
+    max-width: 600px;
+    margin-inline: auto;
+  }
+
+  .badges {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    img { height: 20px; }
+  }
+}
+
+// Content
+.demo-content {
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.demo-section {
+  background: #fff;
+  border-radius: 16px;
+  padding: 32px;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 4px 16px rgba(0, 0, 0, 0.04);
+
+  h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 8px;
+  }
+
+  h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #334155;
+    margin: 24px 0 12px;
+  }
+
+  > p {
+    color: #64748b;
+    margin-bottom: 24px;
+  }
+}
+
+// Why section
+.why-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.why-card {
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+
+  .why-icon {
+    font-size: 2rem;
+    margin-bottom: 8px;
+  }
+
+  h3 {
+    font-size: 0.95rem;
+    margin: 0 0 8px;
+    color: #1e293b;
+  }
+
+  p {
+    font-size: 0.85rem;
+    color: #64748b;
+    line-height: 1.5;
+    margin: 0;
+  }
+
+  code {
+    font-size: 0.75rem;
+    background: #e2e8f0;
+    padding: 1px 4px;
+    border-radius: 3px;
+  }
+}
+
+// Interactive Demo
+.demo-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sample-form {
+  .form-field {
+    margin-bottom: 16px;
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: #475569;
+      margin-bottom: 6px;
+    }
+
+    input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 14px;
+      color: #1e293b;
+      background: #fff;
+      transition: border-color 0.2s, box-shadow 0.2s;
+
+      &:focus {
+        outline: none;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+      }
+
+      &.ng-invalid.ng-touched,
+      &.ng-invalid.ng-dirty {
+        border-color: #ef4444;
+      }
+    }
+
+    .field-error {
+      font-size: 12px;
+      color: #ef4444;
+      margin-top: 4px;
+      min-height: 0;
+    }
+  }
+}
+
+.demo-controls {
+  margin-top: 20px;
+
+  .preset-selector {
+    margin-bottom: 12px;
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: #475569;
+      margin-bottom: 6px;
+    }
+
+    select {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 14px;
+      background: #fff;
+      color: #1e293b;
+      cursor: pointer;
+
+      &:focus {
+        outline: none;
+        border-color: #3b82f6;
+      }
+    }
+  }
+
+  .demo-buttons {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+}
+
+.btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &-primary {
+    background: #3b82f6;
+    color: #fff;
+    &:hover { background: #2563eb; }
+  }
+
+  &-secondary {
+    background: #f1f5f9;
+    color: #475569;
+    &:hover { background: #e2e8f0; }
+  }
+
+  &-ghost {
+    background: transparent;
+    color: #64748b;
+    border: 1px solid #e2e8f0;
+    &:hover { background: #f8fafc; }
+  }
+}
+
+// Result panels
+.result-panel {
+  background: #0f172a;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+  overflow-x: auto;
+
+  &.resolved {
+    background: #1e3a5f;
+  }
+
+  pre {
+    margin: 0;
+    code {
+      font-family: 'Fira Code', monospace;
+      font-size: 12px;
+      color: #94a3b8;
+      line-height: 1.5;
+    }
+  }
+}
+
+.signals-panel {
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 12px;
+
+  .signal-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    border-bottom: 1px solid #e2e8f0;
+
+    &:last-child { border-bottom: none; }
+  }
+
+  .signal-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: #475569;
+  }
+
+  .signal-value {
+    font-family: 'Fira Code', monospace;
+    font-size: 12px;
+    color: #64748b;
+    padding: 2px 8px;
+    background: #e2e8f0;
+    border-radius: 4px;
+
+    &.active {
+      background: #fecaca;
+      color: #dc2626;
+    }
+  }
+}
+
+// Payloads
+.payloads-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.payload-card {
+  background: #0f172a;
+  border-radius: 12px;
+  overflow: hidden;
+
+  h4 {
+    padding: 10px 16px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    background: rgba(255, 255, 255, 0.03);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    margin: 0;
+  }
+
+  pre {
+    padding: 16px;
+    margin: 0;
+    overflow-x: auto;
+
+    code {
+      font-family: 'Fira Code', monospace;
+      font-size: 11px;
+      color: #7dd3fc;
+      line-height: 1.5;
+    }
+  }
+}
+
+// Code blocks
+.code-block {
+  background: #0f172a;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 16px;
+
+  .code-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 16px;
+    background: rgba(255, 255, 255, 0.03);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+
+    span {
+      font-size: 12px;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+  }
+
+  .copy-btn {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #64748b;
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    &:hover { background: rgba(255, 255, 255, 0.05); color: #fff; }
+  }
+
+  pre {
+    padding: 16px;
+    margin: 0;
+    overflow-x: auto;
+    code {
+      font-family: 'Fira Code', monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      color: #e2e8f0;
+    }
+  }
+}
+
+// API tables
+.api-table-wrapper { overflow-x: auto; }
+
+.api-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+
+  th, td {
+    padding: 10px 12px;
+    text-align: left;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  th {
+    background: #f8fafc;
+    font-weight: 600;
+    color: #334155;
+  }
+
+  td code {
+    font-family: 'Fira Code', monospace;
+    font-size: 12px;
+    background: #f1f5f9;
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: #7c3aed;
+  }
+}
+
+.compat-table {
+  @extend .api-table;
+}
+
+// Footer
+.demo-footer {
+  text-align: center;
+  margin-top: 48px;
+  color: #94a3b8;
+  font-size: 14px;
+
+  .footer-links {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    margin-bottom: 12px;
+
+    a {
+      color: #3b82f6;
+      text-decoration: none;
+      font-weight: 500;
+      &:hover { text-decoration: underline; }
+    }
+  }
+
+  p {
+    margin: 0;
+    a {
+      color: #3b82f6;
+      text-decoration: none;
+      &:hover { text-decoration: underline; }
+    }
+  }
+}
+
+// Responsive
+@media (max-width: 480px) {
+  .demo-container { padding: 16px 12px; }
+  .demo-header h1 { font-size: 1.8rem; }
+  .demo-section { padding: 20px 16px; }
+  .why-grid { grid-template-columns: 1fr; }
+  .payloads-grid { grid-template-columns: 1fr; }
+}

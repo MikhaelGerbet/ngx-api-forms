@@ -1,0 +1,288 @@
+<div class="demo-container">
+  <!-- GitHub Corner -->
+  <a href="https://github.com/MikhaelGerbet/ngx-api-forms" class="github-corner" aria-label="View source on GitHub" target="_blank">
+    <svg width="80" height="80" viewBox="0 0 250 250" style="fill:#3b82f6; color:#f8fafc; position: absolute; top: 0; border: 0; right: 0;" aria-hidden="true">
+      <path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path>
+      <path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2" fill="currentColor" style="transform-origin: 130px 106px;" class="octo-arm"></path>
+      <path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z" fill="currentColor" class="octo-body"></path>
+    </svg>
+  </a>
+
+  <header class="demo-header">
+    <h1>ngx-api-forms</h1>
+    <p class="tagline">Bridge your API validation errors to Angular Reactive Forms — automatically.</p>
+    <div class="badges">
+      <img src="https://img.shields.io/npm/v/ngx-api-forms?style=flat-square" alt="npm version">
+      <img src="https://img.shields.io/npm/l/ngx-api-forms?style=flat-square" alt="license">
+      <img src="https://img.shields.io/badge/Angular-17%2B-dd0031?style=flat-square&logo=angular" alt="Angular 17+">
+      <img src="https://img.shields.io/badge/SSR-Ready-brightgreen?style=flat-square" alt="SSR Ready">
+      <img src="https://img.shields.io/badge/i18n-Friendly-blue?style=flat-square" alt="i18n Friendly">
+    </div>
+  </header>
+
+  <main class="demo-content">
+    <!-- Why section -->
+    <section class="demo-section why-section">
+      <h2>Why ngx-api-forms?</h2>
+      <div class="why-grid">
+        <div class="why-card">
+          <div class="why-icon">🔌</div>
+          <h3>API ↔ Forms Bridge</h3>
+          <p>Automatically maps backend validation errors to Angular Reactive Forms controls. No more manual string matching.</p>
+        </div>
+        <div class="why-card">
+          <div class="why-icon">🎯</div>
+          <h3>Multi-Backend Presets</h3>
+          <p>Built-in support for NestJS/class-validator, Laravel, Django REST, and Zod. Extensible for any backend.</p>
+        </div>
+        <div class="why-card">
+          <div class="why-icon">🌍</div>
+          <h3>i18n Ready</h3>
+          <p>Use translation keys or custom resolvers for error messages. Works with any i18n library.</p>
+        </div>
+        <div class="why-card">
+          <div class="why-icon">📡</div>
+          <h3>Signals Support</h3>
+          <p>Built with Angular Signals for reactive error state. <code>errorsSignal</code>, <code>firstErrorSignal</code>, <code>hasErrorsSignal</code>.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Interactive Demo -->
+    <section class="demo-section interactive-demo">
+      <h2>Interactive Demo</h2>
+      <p>Select a backend format and simulate API validation errors on a real Angular form.</p>
+
+      <div class="demo-layout">
+        <div class="demo-form-side">
+          <h3>Sample Form</h3>
+          <form [formGroup]="form" class="sample-form">
+            <div class="form-field">
+              <label for="email">Email</label>
+              <input id="email" type="email" formControlName="email" placeholder="user@example.com">
+              <span ngxFormError="email" [form]="form" class="field-error"></span>
+            </div>
+            <div class="form-field">
+              <label for="name">Name</label>
+              <input id="name" type="text" formControlName="name" placeholder="John Doe">
+              <span ngxFormError="name" [form]="form" class="field-error"></span>
+            </div>
+            <div class="form-field">
+              <label for="age">Age</label>
+              <input id="age" type="number" formControlName="age" placeholder="25">
+              <span ngxFormError="age" [form]="form" class="field-error"></span>
+            </div>
+            <div class="form-field">
+              <label for="password">Password</label>
+              <input id="password" type="password" formControlName="password" placeholder="••••••••">
+              <span ngxFormError="password" [form]="form" class="field-error"></span>
+            </div>
+          </form>
+
+          <div class="demo-controls">
+            <div class="preset-selector">
+              <label>Backend format:</label>
+              <select [value]="selectedMockKey()" (change)="selectedMockKey.set($any($event.target).value)">
+                <option value="class-validator">NestJS / class-validator</option>
+                <option value="class-validator-string">NestJS (string message)</option>
+                <option value="laravel">Laravel</option>
+                <option value="django">Django REST</option>
+                <option value="zod">Zod (flattened)</option>
+                <option value="zod-issues">Zod (issues)</option>
+              </select>
+            </div>
+            <div class="demo-buttons">
+              <button class="btn btn-primary" (click)="simulateApiError()">Simulate API Error</button>
+              <button class="btn btn-secondary" (click)="clearErrors()">Clear Errors</button>
+              <button class="btn btn-ghost" (click)="resetForm()">Reset Form</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="demo-result-side">
+          <h3>Form Errors State</h3>
+          <div class="result-panel">
+            <pre><code>{{ getFormErrors() }}</code></pre>
+          </div>
+
+          @if (lastResult()) {
+            <h3>Resolved Errors (from FormBridge)</h3>
+            <div class="result-panel resolved">
+              <pre><code>{{ lastResult() }}</code></pre>
+            </div>
+          }
+
+          <h3>Signals</h3>
+          <div class="signals-panel">
+            <div class="signal-row">
+              <span class="signal-label">hasErrors:</span>
+              <span class="signal-value" [class.active]="bridge.hasErrorsSignal()">{{ bridge.hasErrorsSignal() }}</span>
+            </div>
+            <div class="signal-row">
+              <span class="signal-label">firstError:</span>
+              <span class="signal-value">{{ bridge.firstErrorSignal()?.field ?? 'null' }}</span>
+            </div>
+            <div class="signal-row">
+              <span class="signal-label">errorsCount:</span>
+              <span class="signal-value">{{ bridge.errorsSignal().length }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Mock API Payloads -->
+    <section class="demo-section payloads-section">
+      <h2>API Error Payloads (Mock)</h2>
+      <p>These are the exact error shapes each backend returns. ngx-api-forms parses them all automatically.</p>
+
+      <div class="payloads-grid">
+        <div class="payload-card">
+          <h4>NestJS / class-validator</h4>
+          <pre><code>{{mockErrors['class-validator'] | json}}</code></pre>
+        </div>
+        <div class="payload-card">
+          <h4>Laravel</h4>
+          <pre><code>{{mockErrors['laravel'] | json}}</code></pre>
+        </div>
+        <div class="payload-card">
+          <h4>Django REST</h4>
+          <pre><code>{{mockErrors['django'] | json}}</code></pre>
+        </div>
+        <div class="payload-card">
+          <h4>Zod (flattened)</h4>
+          <pre><code>{{mockErrors['zod'] | json}}</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- Installation -->
+    <section class="demo-section installation">
+      <h2>Installation</h2>
+      <div class="code-block">
+        <div class="code-header">
+          <span>npm</span>
+          <button class="copy-btn" (click)="copyToClipboard('npm install ngx-api-forms')">Copy</button>
+        </div>
+        <pre><code>npm install ngx-api-forms</code></pre>
+      </div>
+    </section>
+
+    <!-- Quick Start -->
+    <section class="demo-section quick-start">
+      <h2>Quick Start</h2>
+
+      <div class="code-block">
+        <div class="code-header"><span>component.ts</span></div>
+        <pre><code>import &#123; createFormBridge, classValidatorPreset &#125; from 'ngx-api-forms';
+
+export class MyComponent &#123;
+  form = inject(FormBuilder).group(&#123;
+    email: ['', Validators.required],
+    name: ['', Validators.minLength(3)],
+  &#125;);
+
+  bridge = createFormBridge(this.form, &#123;
+    preset: classValidatorPreset(),
+  &#125;);
+
+  onSubmit() &#123;
+    this.api.save(this.form.value).subscribe(&#123;
+      error: (err) =&gt; this.bridge.applyApiErrors(err.error),
+    &#125;);
+  &#125;
+&#125;</code></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header"><span>template.html</span></div>
+        <pre><code>&lt;form [formGroup]="form" (ngSubmit)="onSubmit()"&gt;
+  &lt;input formControlName="email" /&gt;
+  &lt;span ngxFormError="email" [form]="form"&gt;&lt;/span&gt;
+
+  &lt;input formControlName="name" /&gt;
+  &lt;span ngxFormError="name" [form]="form"&gt;&lt;/span&gt;
+
+  &lt;button type="submit"&gt;Save&lt;/button&gt;
+&lt;/form&gt;</code></pre>
+      </div>
+    </section>
+
+    <!-- API Reference -->
+    <section class="demo-section api-ref">
+      <h2>API Reference</h2>
+
+      <h3>FormBridge</h3>
+      <div class="api-table-wrapper">
+        <table class="api-table">
+          <thead>
+            <tr><th>Method</th><th>Returns</th><th>Description</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>applyApiErrors(error)</code></td><td><code>ResolvedFieldError[]</code></td><td>Parse and apply API errors to form controls</td></tr>
+            <tr><td><code>clearApiErrors()</code></td><td><code>void</code></td><td>Clear all API errors, restore client validation</td></tr>
+            <tr><td><code>getFirstError()</code></td><td><code>FirstError | null</code></td><td>Get the first error across all controls</td></tr>
+            <tr><td><code>getFieldErrors(field)</code></td><td><code>ValidationErrors | null</code></td><td>Get errors for a specific field</td></tr>
+            <tr><td><code>setDefaultValues(values)</code></td><td><code>void</code></td><td>Set default values and reset form</td></tr>
+            <tr><td><code>reset()</code></td><td><code>void</code></td><td>Reset form to defaults, clear errors</td></tr>
+            <tr><td><code>enable(options?)</code></td><td><code>void</code></td><td>Enable controls (with exceptions)</td></tr>
+            <tr><td><code>disable(options?)</code></td><td><code>void</code></td><td>Disable controls (with exceptions)</td></tr>
+            <tr><td><code>toFormData()</code></td><td><code>FormData</code></td><td>Convert form values to FormData</td></tr>
+            <tr><td><code>addInterceptor(fn)</code></td><td><code>void</code></td><td>Register an error interceptor</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Signals</h3>
+      <div class="api-table-wrapper">
+        <table class="api-table">
+          <thead>
+            <tr><th>Signal</th><th>Type</th><th>Description</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>errorsSignal</code></td><td><code>Signal&lt;ResolvedFieldError[]&gt;</code></td><td>All current API errors</td></tr>
+            <tr><td><code>firstErrorSignal</code></td><td><code>Signal&lt;FirstError | null&gt;</code></td><td>First error or null</td></tr>
+            <tr><td><code>hasErrorsSignal</code></td><td><code>Signal&lt;boolean&gt;</code></td><td>Whether any API errors exist</td></tr>
+            <tr><td><code>isDirtySignal</code></td><td><code>Signal&lt;boolean&gt;</code></td><td>Whether form changed from defaults</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Presets</h3>
+      <div class="api-table-wrapper">
+        <table class="api-table">
+          <thead>
+            <tr><th>Function</th><th>Backend</th><th>Error format</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>classValidatorPreset()</code></td><td>NestJS / class-validator</td><td><code>&#123; message: [&#123; property, constraints &#125;] &#125;</code></td></tr>
+            <tr><td><code>laravelPreset()</code></td><td>Laravel</td><td><code>&#123; errors: &#123; field: [msgs] &#125; &#125;</code></td></tr>
+            <tr><td><code>djangoPreset()</code></td><td>Django REST</td><td><code>&#123; field: [msgs] &#125;</code></td></tr>
+            <tr><td><code>zodPreset()</code></td><td>Zod</td><td><code>&#123; fieldErrors: &#123;...&#125; &#125;</code> or <code>&#123; issues: [...] &#125;</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Compatibility -->
+    <section class="demo-section compatibility">
+      <h2>Angular Compatibility</h2>
+      <table class="compat-table">
+        <thead>
+          <tr><th>ngx-api-forms</th><th>Angular</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>1.x</td><td>17.x, 18.x, 19.x, 20.x</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <footer class="demo-footer">
+    <div class="footer-links">
+      <a href="https://github.com/MikhaelGerbet/ngx-api-forms" target="_blank">GitHub</a>
+      <a href="https://www.npmjs.com/package/ngx-api-forms" target="_blank">npm</a>
+    </div>
+    <p>ngx-api-forms &copy; {{ currentYear }} <a href="https://github.com/MikhaelGerbet" target="_blank">Mikha&euml;l GERBET</a> | MIT License</p>
+  </footer>
+</div>
