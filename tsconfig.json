@@ -9,7 +9,7 @@
     "noImplicitReturns": true,
     "paths": {
       "ngx-api-forms": [
-        "./dist/ngx-api-forms"
+        "./projects/ngx-api-forms/src/public-api"
       ]
     },
     "noFallthroughCasesInSwitch": true,
