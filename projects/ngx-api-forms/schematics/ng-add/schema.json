@@ -15,7 +15,7 @@
       "type": "string",
       "description": "The backend preset to generate.",
       "default": "class-validator",
-      "enum": ["laravel", "django", "class-validator", "zod", "express-validator"],
+      "enum": ["laravel", "django", "class-validator", "zod", "express-validator", "analog"],
       "x-prompt": {
         "message": "Which backend preset do you want to use?",
         "type": "list",
@@ -24,7 +24,8 @@
           { "value": "laravel", "label": "Laravel" },
           { "value": "django", "label": "Django REST Framework" },
           { "value": "express-validator", "label": "Express / express-validator" },
-          { "value": "zod", "label": "Zod (tRPC, Remix, etc.)" }
+          { "value": "zod", "label": "Zod (tRPC, Remix, etc.)" },
+          { "value": "analog", "label": "Analog (Nitro/h3 backend)" }
         ]
       }
     }

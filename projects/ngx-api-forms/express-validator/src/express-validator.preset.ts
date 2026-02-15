@@ -38,6 +38,7 @@ interface ExpressValidatorError {
   msg: string;
   location?: string;
   value?: unknown;
+  code?: string;    // custom error code for schema-based inference
 }
 
 /**
@@ -179,7 +180,10 @@ export function expressValidatorPreset(options?: { noInference?: boolean; constr
 
         const field = extractField(err);
         let constraint: string;
-        if (skipInference) {
+        if (err.code) {
+          // Schema-based: use structured code directly (language-independent)
+          constraint = err.code;
+        } else if (skipInference) {
           constraint = 'serverError';
         } else if (userPatterns) {
           constraint = matchUserPatterns(err.msg, userPatterns) ?? inferConstraint(err.msg);

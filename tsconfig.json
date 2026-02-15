@@ -22,6 +22,9 @@
       ],
       "ngx-api-forms/express-validator": [
         "./projects/ngx-api-forms/express-validator/src/public-api"
+      ],
+      "ngx-api-forms/analog": [
+        "./projects/ngx-api-forms/analog/src/public-api"
       ]
     },
     "noFallthroughCasesInSwitch": true,

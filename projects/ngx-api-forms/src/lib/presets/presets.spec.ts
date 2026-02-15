@@ -3,6 +3,7 @@ import { laravelPreset } from 'ngx-api-forms/laravel';
 import { djangoPreset } from 'ngx-api-forms/django';
 import { zodPreset } from 'ngx-api-forms/zod';
 import { expressValidatorPreset } from 'ngx-api-forms/express-validator';
+import { analogPreset } from 'ngx-api-forms/analog';
 import { GLOBAL_ERROR_FIELD } from '../models/api-forms.models';
 
 describe('Error Presets', () => {
@@ -541,4 +542,239 @@ describe('Error Presets', () => {
       expect(result[0].constraint).toBe('serverError');
     });
   });
+
+  // ===========================================================================
+  // Schema-Based Inference (structured error codes)
+  // ===========================================================================
+
+  describe('Schema-based inference', () => {
+    it('djangoPreset should use code from { message, code } objects', () => {
+      const preset = djangoPreset();
+      const result = preset.parse({
+        email: [{ message: 'Ce champ est obligatoire.', code: 'required' }],
+        name: [{ message: 'Doit contenir 3 caracteres', code: 'min_length' }],
+      });
+
+      expect(result.length).toBe(2);
+      expect(result[0].constraint).toBe('required');
+      expect(result[0].message).toBe('Ce champ est obligatoire.');
+      expect(result[1].constraint).toBe('min_length');
+    });
+
+    it('djangoPreset should mix structured and string errors', () => {
+      const preset = djangoPreset();
+      const result = preset.parse({
+        email: [
+          { message: 'Obligatoire', code: 'required' },
+          'Enter a valid email address.',
+        ],
+      });
+
+      expect(result.length).toBe(2);
+      expect(result[0].constraint).toBe('required');
+      expect(result[1].constraint).toBe('email');
+    });
+
+    it('laravelPreset should use rule from { message, rule } objects', () => {
+      const preset = laravelPreset();
+      const result = preset.parse({
+        errors: {
+          email: [{ message: 'Le champ email est requis.', rule: 'required' }],
+          name: [{ message: 'Le nom doit contenir 3 caracteres.', rule: 'min' }],
+        },
+      });
+
+      expect(result.length).toBe(2);
+      expect(result[0].constraint).toBe('required');
+      expect(result[0].message).toBe('Le champ email est requis.');
+      expect(result[1].constraint).toBe('min');
+    });
+
+    it('laravelPreset should mix structured and string errors', () => {
+      const preset = laravelPreset();
+      const result = preset.parse({
+        errors: {
+          email: [
+            { message: 'Requis', rule: 'required' },
+            'The email must be a valid email address.',
+          ],
+        },
+      });
+
+      expect(result.length).toBe(2);
+      expect(result[0].constraint).toBe('required');
+      expect(result[1].constraint).toBe('email');
+    });
+
+    it('expressValidatorPreset should use code field when present', () => {
+      const preset = expressValidatorPreset();
+      const result = preset.parse({
+        errors: [
+          { type: 'field', path: 'email', msg: 'Adresse invalide', code: 'email', location: 'body' },
+          { type: 'field', path: 'name', msg: 'Champ obligatoire', code: 'required', location: 'body' },
+        ],
+      });
+
+      expect(result.length).toBe(2);
+      expect(result[0].constraint).toBe('email');
+      expect(result[0].message).toBe('Adresse invalide');
+      expect(result[1].constraint).toBe('required');
+    });
+
+    it('expressValidatorPreset should fall back to inference when no code', () => {
+      const preset = expressValidatorPreset();
+      const result = preset.parse({
+        errors: [
+          { type: 'field', path: 'email', msg: 'Must be a valid email', location: 'body' },
+          { type: 'field', path: 'name', msg: 'Champ obligatoire', code: 'required', location: 'body' },
+        ],
+      });
+
+      expect(result[0].constraint).toBe('email');  // inferred
+      expect(result[1].constraint).toBe('required'); // from code
+    });
+
+    it('schema-based codes should bypass noInference', () => {
+      const preset = djangoPreset({ noInference: true });
+      const result = preset.parse({
+        email: [{ message: 'Requis', code: 'required' }],
+      });
+      expect(result[0].constraint).toBe('required');
+    });
+
+    it('schema-based codes should bypass constraintPatterns', () => {
+      const preset = laravelPreset({
+        constraintPatterns: { custom: /.*/ },
+      });
+      const result = preset.parse({
+        errors: {
+          email: [{ message: 'Anything', rule: 'specific_rule' }],
+        },
+      });
+      expect(result[0].constraint).toBe('specific_rule');
+    });
+  });
+
+  // ===========================================================================
+  // Analog Preset
+  // ===========================================================================
+
+  describe('analogPreset', () => {
+    const preset = analogPreset();
+
+    it('should have name "analog"', () => {
+      expect(preset.name).toBe('analog');
+    });
+
+    it('should parse Nitro envelope { statusCode, data: { field: string[] } }', () => {
+      const result = preset.parse({
+        statusCode: 422,
+        statusMessage: 'Validation failed',
+        data: {
+          email: ['This field is required.'],
+          name: ['Must be at least 3 characters.'],
+        },
+      });
+
+      expect(result.length).toBe(2);
+      expect(result[0].field).toBe('email');
+      expect(result[0].constraint).toBe('required');
+      expect(result[1].field).toBe('name');
+      expect(result[1].constraint).toBe('minlength');
+    });
+
+    it('should handle direct { field: string[] } format without envelope', () => {
+      const result = preset.parse({
+        email: ['Enter a valid email address.'],
+      });
+
+      expect(result.length).toBe(1);
+      expect(result[0].constraint).toBe('email');
+    });
+
+    it('should route _errors and non_field_errors to global', () => {
+      const result = preset.parse({
+        statusCode: 422,
+        data: {
+          _errors: ['Request rate limited.'],
+          non_field_errors: ['Invalid credentials.'],
+          email: ['Required.'],
+        },
+      });
+
+      const globalErrors = result.filter(e => e.field === GLOBAL_ERROR_FIELD);
+      const fieldErrors = result.filter(e => e.field !== GLOBAL_ERROR_FIELD);
+
+      expect(globalErrors.length).toBe(2);
+      expect(fieldErrors.length).toBe(1);
+      expect(fieldErrors[0].field).toBe('email');
+    });
+
+    it('should use statusMessage as global error when no data', () => {
+      const result = preset.parse({
+        statusCode: 500,
+        statusMessage: 'Internal Server Error',
+      });
+
+      expect(result.length).toBe(1);
+      expect(result[0].field).toBe(GLOBAL_ERROR_FIELD);
+      expect(result[0].message).toBe('Internal Server Error');
+    });
+
+    it('should support structured { message, code } objects', () => {
+      const result = preset.parse({
+        statusCode: 422,
+        data: {
+          email: [{ message: 'Adresse email invalide', code: 'email' }],
+          password: [{ message: 'Trop court', code: 'min_length' }],
+        },
+      });
+
+      expect(result.length).toBe(2);
+      expect(result[0].constraint).toBe('email');
+      expect(result[0].message).toBe('Adresse email invalide');
+      expect(result[1].constraint).toBe('min_length');
+    });
+
+    it('should support constraintPatterns', () => {
+      const preset2 = analogPreset({
+        constraintPatterns: {
+          required: /obligatoire/i,
+        },
+      });
+
+      const result = preset2.parse({
+        statusCode: 422,
+        data: {
+          name: ['Ce champ est obligatoire'],
+        },
+      });
+
+      expect(result[0].constraint).toBe('required');
+    });
+
+    it('should support noInference', () => {
+      const preset2 = analogPreset({ noInference: true });
+      const result = preset2.parse({
+        statusCode: 422,
+        data: {
+          email: ['This field is required.'],
+        },
+      });
+
+      expect(result[0].constraint).toBe('serverError');
+    });
+
+    it('should return empty for null/undefined', () => {
+      expect(preset.parse(null)).toEqual([]);
+      expect(preset.parse(undefined)).toEqual([]);
+      expect(preset.parse(42)).toEqual([]);
+      expect(preset.parse('string')).toEqual([]);
+    });
+
+    it('should return empty for arrays', () => {
+      expect(preset.parse([1, 2, 3])).toEqual([]);
+    });
+  });
+
 });

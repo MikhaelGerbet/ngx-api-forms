@@ -33,6 +33,11 @@ const PRESET_CONFIG = {
     importPath: "ngx-api-forms/express-validator",
     call: "expressValidatorPreset()",
   },
+  analog: {
+    importName: "analogPreset",
+    importPath: "ngx-api-forms/analog",
+    call: "analogPreset()",
+  },
 };
 
 function ngAdd(options) {
@@ -55,22 +60,176 @@ function ngAdd(options) {
       );
     }
 
-    // 2. Try to add interceptor to app.config.ts
+    // 2. Auto-inject interceptor into app.config.ts
     const appConfigPath = "src/app/app.config.ts";
     if (tree.exists(appConfigPath)) {
       const content = tree.read(appConfigPath).toString("utf-8");
-      if (!content.includes("apiErrorInterceptor")) {
+      const updated = injectInterceptor(content);
+      if (updated !== content) {
+        tree.overwrite(appConfigPath, updated);
         context.logger.info(
-          "\nTo enable automatic error handling, add the interceptor to your app.config.ts:\n\n" +
+          "Updated " + appConfigPath + ": added apiErrorInterceptor to HttpClient interceptors."
+        );
+      } else if (content.includes("apiErrorInterceptor")) {
+        context.logger.info(
+          appConfigPath + " already contains apiErrorInterceptor. Skipping."
+        );
+      } else {
+        context.logger.warn(
+          "Could not auto-inject interceptor into " + appConfigPath + ".\n" +
+          "Add it manually:\n\n" +
           "  import { provideHttpClient, withInterceptors } from '@angular/common/http';\n" +
           "  import { apiErrorInterceptor } from 'ngx-api-forms';\n\n" +
           "  provideHttpClient(withInterceptors([apiErrorInterceptor()]))\n"
         );
       }
+    } else {
+      context.logger.warn(
+        "Could not find " + appConfigPath + ". Add the interceptor manually:\n\n" +
+        "  import { provideHttpClient, withInterceptors } from '@angular/common/http';\n" +
+        "  import { apiErrorInterceptor } from 'ngx-api-forms';\n\n" +
+        "  provideHttpClient(withInterceptors([apiErrorInterceptor()]))\n"
+      );
     }
 
     return tree;
   };
+}
+
+/**
+ * Attempts to inject `apiErrorInterceptor()` into an app.config.ts file.
+ * Returns the modified content, or the original if injection was not possible.
+ *
+ * Handles three cases:
+ * 1. `withInterceptors([...])` exists -> add apiErrorInterceptor() to the array
+ * 2. `provideHttpClient(...)` exists without withInterceptors -> add withInterceptors
+ * 3. Neither exists -> add provideHttpClient with interceptor to providers array
+ */
+function injectInterceptor(content) {
+  // Already present
+  if (content.includes("apiErrorInterceptor")) return content;
+
+  let result = content;
+
+  // Ensure apiErrorInterceptor import exists
+  // Check if there's already an import from 'ngx-api-forms'
+  const ngxImportRegex = /import\s*\{([^}]+)\}\s*from\s*['"]ngx-api-forms['"]/;
+  const ngxImportMatch = result.match(ngxImportRegex);
+  if (ngxImportMatch) {
+    // Add to existing import (trim to avoid double spaces)
+    const existingImports = ngxImportMatch[1].trim();
+    result = result.replace(
+      ngxImportMatch[0],
+      "import { " + existingImports + ", apiErrorInterceptor } from 'ngx-api-forms'"
+    );
+  } else {
+    // Add new import after last import line
+    const lastImportIndex = result.lastIndexOf("import ");
+    if (lastImportIndex !== -1) {
+      const afterImport = result.substring(lastImportIndex);
+      const semiIndex = afterImport.indexOf(";");
+      if (semiIndex !== -1) {
+        const importEnd = lastImportIndex + semiIndex + 1;
+        result =
+          result.substring(0, importEnd) +
+          "\nimport { apiErrorInterceptor } from 'ngx-api-forms';" +
+          result.substring(importEnd);
+      }
+    }
+  }
+
+  // Case 1: withInterceptors([...]) exists -> add to array
+  const withInterceptorsRegex = /withInterceptors\s*\(\s*\[([^\]]*)\]/;
+  const withInterceptorsMatch = result.match(withInterceptorsRegex);
+  if (withInterceptorsMatch) {
+    const existingInterceptors = withInterceptorsMatch[1].trim();
+    const separator = existingInterceptors.length > 0 ? ", " : "";
+    result = result.replace(
+      withInterceptorsMatch[0],
+      "withInterceptors([" + existingInterceptors + separator + "apiErrorInterceptor()]"
+    );
+    result = ensureHttpImport(result, "withInterceptors");
+    return result;
+  }
+
+  // Case 2: provideHttpClient(...) exists without withInterceptors
+  // Use balanced-paren scanner to handle nested calls like withFetch()
+  const phcIndex = result.indexOf("provideHttpClient(");
+  if (phcIndex !== -1) {
+    const openParen = phcIndex + "provideHttpClient".length;
+    let depth = 0;
+    let closeParen = -1;
+    for (let i = openParen; i < result.length; i++) {
+      if (result[i] === "(") depth++;
+      else if (result[i] === ")") {
+        depth--;
+        if (depth === 0) { closeParen = i; break; }
+      }
+    }
+    if (closeParen !== -1) {
+      const existingArgs = result.substring(openParen + 1, closeParen).trim();
+      const separator = existingArgs.length > 0 ? ", " : "";
+      result =
+        result.substring(0, openParen + 1) +
+        existingArgs + separator + "withInterceptors([apiErrorInterceptor()])" +
+        result.substring(closeParen);
+      result = ensureHttpImport(result, "provideHttpClient");
+      result = ensureHttpImport(result, "withInterceptors");
+      return result;
+    }
+  }
+
+  // Case 3: No provideHttpClient -> add to providers array
+  const providersRegex = /providers\s*:\s*\[/;
+  const providersMatch = result.match(providersRegex);
+  if (providersMatch) {
+    result = result.replace(
+      providersMatch[0],
+      providersMatch[0] +
+        "\n    provideHttpClient(withInterceptors([apiErrorInterceptor()])),"
+    );
+    result = ensureHttpImport(result, "provideHttpClient");
+    result = ensureHttpImport(result, "withInterceptors");
+    return result;
+  }
+
+  // Could not inject
+  return content;
+}
+
+/**
+ * Ensures a symbol is imported from '@angular/common/http'.
+ * Only checks import statements, not usage in code.
+ */
+function ensureHttpImport(content, symbol) {
+  const httpImportRegex = /import\s*\{([^}]+)\}\s*from\s*['"]@angular\/common\/http['"]/;
+  const match = content.match(httpImportRegex);
+
+  if (match) {
+    // Already imported?
+    if (match[1].includes(symbol)) return content;
+    // Add to existing import
+    return content.replace(
+      match[0],
+      "import { " + match[1].trim() + ", " + symbol + " } from '@angular/common/http'"
+    );
+  }
+
+  // Add new import after last import
+  const lastImportIndex = content.lastIndexOf("import ");
+  if (lastImportIndex !== -1) {
+    const afterImport = content.substring(lastImportIndex);
+    const semiIndex = afterImport.indexOf(";");
+    if (semiIndex !== -1) {
+      const importEnd = lastImportIndex + semiIndex + 1;
+      return (
+        content.substring(0, importEnd) +
+        "\nimport { " + symbol + " } from '@angular/common/http';" +
+        content.substring(importEnd)
+      );
+    }
+  }
+  return content;
 }
 
 function buildExampleContent(config) {
@@ -138,3 +297,4 @@ function buildExampleContent(config) {
 }
 
 exports.ngAdd = ngAdd;
+exports.injectInterceptor = injectInterceptor;

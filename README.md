@@ -137,6 +137,7 @@ import { djangoPreset }            from 'ngx-api-forms/django';
 import { laravelPreset }           from 'ngx-api-forms/laravel';
 import { zodPreset }               from 'ngx-api-forms/zod';
 import { expressValidatorPreset }  from 'ngx-api-forms/express-validator';
+import { analogPreset }            from 'ngx-api-forms/analog';
 ```
 
 If your project uses `ng add`:
@@ -145,7 +146,9 @@ If your project uses `ng add`:
 ng add ngx-api-forms --preset=laravel
 ```
 
-Available presets: `laravel`, `django`, `class-validator`, `zod`, `express-validator`.
+This installs the package, creates an example component, and auto-injects `apiErrorInterceptor` into your `app.config.ts`.
+
+Available presets: `laravel`, `django`, `class-validator`, `zod`, `express-validator`, `analog`.
 
 ## Supported Backend Formats
 
@@ -196,6 +199,20 @@ Available presets: `laravel`, `django`, `class-validator`, `zod`, `express-valid
 ```
 
 Also handles the legacy v5/v6 format (`{ param, msg }`) and direct arrays.
+
+### Analog (Nitro/h3)
+```json
+{
+  "statusCode": 422,
+  "statusMessage": "Validation failed",
+  "data": {
+    "email": ["This field is required."],
+    "name": ["Must be at least 3 characters."]
+  }
+}
+```
+
+Unwraps the Nitro/h3 `createError()` envelope. Also handles direct `{ field: string[] }` format without the envelope.
 
 ## Constraint Inference and i18n Limitation
 
@@ -251,6 +268,23 @@ const bridge = provideFormBridge(form, {
 // 5. Write a custom preset for full control (see below)
 ```
 
+### Schema-Based Inference
+
+When your backend returns structured error codes alongside messages, presets use them directly without text matching. This makes constraint inference fully language-independent.
+
+```json
+// Django DRF with custom exception handler
+{ "email": [{ "message": "Ce champ est obligatoire.", "code": "required" }] }
+
+// Laravel with rule names
+{ "errors": { "email": [{ "message": "Le champ est requis.", "rule": "required" }] } }
+
+// express-validator with code field
+{ "errors": [{ "type": "field", "path": "email", "msg": "Adresse invalide", "code": "email" }] }
+```
+
+When `code` (Django/Analog), `rule` (Laravel), or `code` (express-validator) is present, the value is used as the constraint directly. No regex matching, no language assumption. Falls back to text inference when the structured field is absent.
+
 ## Global Errors
 
 Some backends return errors not tied to any specific field -- Django's `non_field_errors`, Zod's `formErrors`, or a field name that does not match any form control. These errors are collected in `globalErrorsSignal` instead of being silently dropped.
@@ -282,6 +316,7 @@ import { laravelPreset } from 'ngx-api-forms/laravel';
 import { djangoPreset } from 'ngx-api-forms/django';
 import { zodPreset } from 'ngx-api-forms/zod';
 import { expressValidatorPreset } from 'ngx-api-forms/express-validator';
+import { analogPreset } from 'ngx-api-forms/analog';
 import { classValidatorPreset } from 'ngx-api-forms';
 
 // Laravel
@@ -295,6 +330,9 @@ const bridge = provideFormBridge(form, { preset: zodPreset() });
 
 // Express / express-validator
 const bridge = provideFormBridge(form, { preset: expressValidatorPreset() });
+
+// Analog (Nitro/h3)
+const bridge = provideFormBridge(form, { preset: analogPreset() });
 
 // Multiple presets, tried in order
 const bridge = provideFormBridge(form, {
@@ -495,6 +533,7 @@ laravelPreset({ noInference: true })
 djangoPreset({ noInference: true })
 zodPreset({ noInference: true })
 expressValidatorPreset({ noInference: true })
+analogPreset({ noInference: true })
 classValidatorPreset({ noInference: true })  // only affects string message fallback
 
 // Provide regex patterns for non-English messages

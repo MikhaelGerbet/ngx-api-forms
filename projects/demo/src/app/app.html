@@ -132,6 +132,7 @@ this.http.post('/api', data).subscribe(&#123;
                 <option value="zod">Zod (flattened)</option>
                 <option value="zod-issues">Zod (issues)</option>
                 <option value="express-validator">Express / express-validator</option>
+                <option value="analog">Analog (Nitro/h3)</option>
               </select>
             </div>
             <div class="demo-buttons">
@@ -696,6 +697,7 @@ onSubmit() &#123;
                 <option value="django">Django REST</option>
                 <option value="zod">Zod</option>
                 <option value="express-validator">Express / express-validator</option>
+                <option value="analog">Analog (Nitro/h3)</option>
               </select>
             </div>
             <div class="demo-buttons">
@@ -781,6 +783,7 @@ errorStore.setFieldErrors(errors);</code></pre>
                 <option value="django">Django REST</option>
                 <option value="zod">Zod</option>
                 <option value="express-validator">Express / express-validator</option>
+                <option value="analog">Analog (Nitro/h3)</option>
               </select>
             </div>
             <div class="demo-buttons">
@@ -851,6 +854,10 @@ errorStore.setFieldErrors(errors);</code></pre>
           <h4>Express / express-validator</h4>
           <pre><code>{{mockErrors['express-validator'] | json}}</code></pre>
         </div>
+        <div class="payload-card">
+          <h4>Analog (Nitro/h3)</h4>
+          <pre><code>{{mockErrors['analog'] | json}}</code></pre>
+        </div>
       </div>
     </section>
 
@@ -875,7 +882,8 @@ import &#123; provideFormBridge, classValidatorPreset &#125; from 'ngx-api-forms
 import &#123; djangoPreset &#125; from 'ngx-api-forms/django';
 import &#123; laravelPreset &#125; from 'ngx-api-forms/laravel';
 import &#123; zodPreset &#125; from 'ngx-api-forms/zod';
-import &#123; expressValidatorPreset &#125; from 'ngx-api-forms/express-validator';</code></pre>
+import &#123; expressValidatorPreset &#125; from 'ngx-api-forms/express-validator';
+import &#123; analogPreset &#125; from 'ngx-api-forms/analog';</code></pre>
       </div>
     </section>
 
@@ -967,6 +975,7 @@ export class MyComponent &#123;
             <tr><td><code>djangoPreset()</code></td><td>Django REST</td><td><code>&#123; field: [msgs] &#125;</code></td></tr>
             <tr><td><code>zodPreset()</code></td><td>Zod</td><td><code>&#123; fieldErrors: &#123;...&#125; &#125;</code> or <code>&#123; issues: [...] &#125;</code></td></tr>
             <tr><td><code>expressValidatorPreset()</code></td><td>Express / express-validator</td><td><code>&#123; errors: [&#123; path, msg &#125;] &#125;</code></td></tr>
+            <tr><td><code>analogPreset()</code></td><td>Analog (Nitro/h3)</td><td><code>&#123; statusCode, data: &#123; field: [msgs] &#125; &#125;</code></td></tr>
           </tbody>
         </table>
       </div>

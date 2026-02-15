@@ -17,6 +17,7 @@ import { laravelPreset } from 'ngx-api-forms/laravel';
 import { djangoPreset } from 'ngx-api-forms/django';
 import { zodPreset } from 'ngx-api-forms/zod';
 import { expressValidatorPreset } from 'ngx-api-forms/express-validator';
+import { analogPreset } from 'ngx-api-forms/analog';
 
 @Component({
   selector: 'app-root',
@@ -187,6 +188,15 @@ export class App {
         { type: 'field', path: 'age', msg: 'Must be at least 18', location: 'body' },
       ],
     },
+    analog: {
+      statusCode: 422,
+      statusMessage: 'Validation failed',
+      data: {
+        email: ['This field is required.', 'Enter a valid email address.'],
+        name: ['Must be at least 3 characters.'],
+        age: ['Must be at least 18.'],
+      },
+    },
   };
 
   selectedMockKey = signal<string>('class-validator');
@@ -204,6 +214,7 @@ export class App {
     else if (key === 'laravel') preset = laravelPreset();
     else if (key === 'django') preset = djangoPreset();
     else if (key === 'express-validator') preset = expressValidatorPreset();
+    else if (key === 'analog') preset = analogPreset();
     else preset = zodPreset();
 
     this.bridge = createFormBridge(this.form, { preset });
@@ -317,6 +328,7 @@ export class App {
       else if (key === 'laravel') preset = laravelPreset();
       else if (key === 'django') preset = djangoPreset();
       else if (key === 'express-validator') preset = expressValidatorPreset();
+      else if (key === 'analog') preset = analogPreset();
       else preset = zodPreset();
 
       this.customJsonBridge = createFormBridge(this.customJsonForm, { preset });
@@ -343,6 +355,7 @@ export class App {
     else if (key === 'laravel') preset = laravelPreset();
     else if (key === 'django') preset = djangoPreset();
     else if (key === 'express-validator') preset = expressValidatorPreset();
+    else if (key === 'analog') preset = analogPreset();
     else preset = zodPreset();
 
     // parseApiErrors works without any form or FormBridge

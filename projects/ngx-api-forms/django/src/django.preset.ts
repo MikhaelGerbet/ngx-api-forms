@@ -17,7 +17,16 @@
  * }
  * ```
  */
-import { ApiFieldError, ConstraintMap, DjangoValidationErrors, ErrorPreset, GLOBAL_ERROR_FIELD } from 'ngx-api-forms';
+import { ApiFieldError, ConstraintMap, ErrorPreset, GLOBAL_ERROR_FIELD } from 'ngx-api-forms';
+
+/**
+ * Shape of a structured DRF error object (when using a custom exception handler
+ * that includes the validator `code`).
+ */
+interface DjangoStructuredError {
+  message: string;
+  code: string;
+}
 
 /**
  * Infers a constraint key from a Django REST Framework validation message.
@@ -25,8 +34,8 @@ import { ApiFieldError, ConstraintMap, DjangoValidationErrors, ErrorPreset, GLOB
  * @remarks
  * This function relies on English-language pattern matching (e.g. "this field is required",
  * "valid email"). If your Django backend returns translated messages (USE_I18N=True with
- * non-English locale), the inference will fall back to 'serverError'. In that case, use a
- * `constraintMap` in your FormBridgeConfig or write a custom preset.
+ * non-English locale), the inference will fall back to 'serverError'. In that case, use
+ * structured error codes (`{ message, code }`) or `constraintPatterns` for reliable i18n.
  */
 /**
  * Tries user-provided constraint patterns against a message.
@@ -121,7 +130,7 @@ export function djangoPreset(options?: { camelCase?: boolean; noInference?: bool
     parse(error: unknown): ApiFieldError[] {
       if (!error || typeof error !== 'object' || Array.isArray(error)) return [];
 
-      const errors = error as DjangoValidationErrors;
+      const errors = error as Record<string, unknown>;
       const result: ApiFieldError[] = [];
 
       for (const [rawField, messages] of Object.entries(errors)) {
@@ -132,17 +141,25 @@ export function djangoPreset(options?: { camelCase?: boolean; noInference?: bool
           ? GLOBAL_ERROR_FIELD
           : (shouldCamelCase ? snakeToCamel(rawField) : rawField);
 
-        for (const message of messages) {
-          if (typeof message !== 'string') continue;
+        for (const item of messages) {
+          // Structured format: { message: string, code: string }
+          if (typeof item === 'object' && item !== null && 'message' in item && 'code' in item) {
+            const structured = item as DjangoStructuredError;
+            result.push({ field, constraint: structured.code, message: structured.message });
+            continue;
+          }
+
+          // Standard format: plain string
+          if (typeof item !== 'string') continue;
           let constraint: string;
           if (skipInference) {
             constraint = 'serverError';
           } else if (userPatterns) {
-            constraint = matchUserPatterns(message, userPatterns) ?? inferConstraint(message);
+            constraint = matchUserPatterns(item, userPatterns) ?? inferConstraint(item);
           } else {
-            constraint = inferConstraint(message);
+            constraint = inferConstraint(item);
           }
-          result.push({ field, constraint, message });
+          result.push({ field, constraint, message: item });
         }
       }
 

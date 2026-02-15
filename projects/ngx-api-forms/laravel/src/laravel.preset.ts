@@ -15,13 +15,22 @@
 import { ApiFieldError, ConstraintMap, ErrorPreset, LaravelValidationErrors } from 'ngx-api-forms';
 
 /**
+ * Shape of a structured Laravel error object (when using a custom exception handler
+ * that includes the validation `rule` name).
+ */
+interface LaravelStructuredError {
+  message: string;
+  rule: string;
+}
+
+/**
  * Infers a constraint key from a Laravel validation message.
  *
  * @remarks
  * This function relies on English-language pattern matching (e.g. "is required",
  * "must be a valid email"). If your Laravel backend returns translated messages,
- * the inference will fall back to 'serverError'. In that case, use a `constraintMap`
- * in your FormBridgeConfig or write a custom preset.
+ * the inference will fall back to 'serverError'. In that case, use structured
+ * error codes (`{ message, rule }`) or `constraintPatterns` for reliable i18n.
  */
 /**
  * Tries user-provided constraint patterns against a message.
@@ -138,17 +147,25 @@ export function laravelPreset(options?: { noInference?: boolean; constraintPatte
         // Laravel uses dot notation for nested fields (e.g. 'address.city')
         const normalizedField = field.replace(/\.\*/g, '').replace(/\.\d+\./g, '.');
 
-        for (const message of messages) {
-          if (typeof message !== 'string') continue;
+        for (const item of messages) {
+          // Structured format: { message: string, rule: string }
+          if (typeof item === 'object' && item !== null && 'message' in item && 'rule' in item) {
+            const structured = item as LaravelStructuredError;
+            result.push({ field: normalizedField, constraint: structured.rule, message: structured.message });
+            continue;
+          }
+
+          // Standard format: plain string
+          if (typeof item !== 'string') continue;
           let constraint: string;
           if (skipInference) {
             constraint = 'serverError';
           } else if (userPatterns) {
-            constraint = matchUserPatterns(message, userPatterns) ?? inferConstraint(message);
+            constraint = matchUserPatterns(item, userPatterns) ?? inferConstraint(item);
           } else {
-            constraint = inferConstraint(message);
+            constraint = inferConstraint(item);
           }
-          result.push({ field: normalizedField, constraint, message });
+          result.push({ field: normalizedField, constraint, message: item });
         }
       }
 
