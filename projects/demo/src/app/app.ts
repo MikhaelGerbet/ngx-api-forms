@@ -188,7 +188,7 @@ export class App {
       this.i18nBridge = createFormBridge(this.i18nForm, {
         preset: classValidatorPreset(),
         i18n: {
-          resolver: (field, constraint, _msg) => {
+          resolver: (field: string, constraint: string, _msg: string) => {
             return translations[`${field}.${constraint}`] ?? null;
           },
         },
@@ -225,7 +225,7 @@ export class App {
     });
 
     this.submitBridge.handleSubmit(mockApiCall$).subscribe({
-      next: (result) => {
+      next: (result: { success: boolean }) => {
         this.submitResult.set('Success: ' + JSON.stringify(result));
       },
       error: () => {
