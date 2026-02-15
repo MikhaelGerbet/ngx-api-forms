@@ -11,6 +11,7 @@
  */
 import { signal, computed, Signal, WritableSignal } from '@angular/core';
 import { FormGroup, ValidationErrors } from '@angular/forms';
+import { Observable, tap, catchError } from 'rxjs';
 
 import {
   ApiFieldError,
@@ -71,6 +72,9 @@ export class FormBridge {
   /** Signal containing dirty state tracking */
   private readonly _isDirty: WritableSignal<boolean> = signal(false);
 
+  /** Signal containing submitting state */
+  private readonly _isSubmitting: WritableSignal<boolean> = signal(false);
+
   // ---- Public Signals ----
 
   /** Reactive signal of all current API errors applied to the form */
@@ -87,6 +91,9 @@ export class FormBridge {
 
   /** Whether the form has been modified from its default values */
   readonly isDirtySignal: Signal<boolean> = this._isDirty.asReadonly();
+
+  /** Whether a submit operation is in progress */
+  readonly isSubmittingSignal: Signal<boolean> = this._isSubmitting.asReadonly();
 
   constructor(form: FormGroup, config?: FormBridgeConfig) {
     this._form = form;
@@ -203,6 +210,53 @@ export class FormBridge {
    */
   addInterceptor(interceptor: ErrorInterceptor): void {
     this._interceptors.push(interceptor);
+  }
+
+  /**
+   * Wrap an Observable (typically an HTTP call) with automatic form state management.
+   *
+   * - Disables the form and sets isSubmittingSignal to true
+   * - On success: re-enables the form
+   * - On error: re-enables the form and applies API errors
+   *
+   * The error is re-thrown so your subscriber's error handler still runs.
+   *
+   * @param source - The Observable to wrap (e.g. an HttpClient call)
+   * @param options.extractError - Custom function to extract the error body (default: err.error ?? err)
+   * @returns The wrapped Observable
+   *
+   * @example
+   * ```typescript
+   * bridge.handleSubmit(
+   *   this.http.post('/api/save', this.form.value)
+   * ).subscribe({
+   *   next: () => this.router.navigate(['/success']),
+   *   error: () => console.log('Errors applied to form automatically'),
+   * });
+   * ```
+   */
+  handleSubmit<T>(
+    source: Observable<T>,
+    options?: { extractError?: (err: unknown) => unknown }
+  ): Observable<T> {
+    this.disable();
+    this._isSubmitting.set(true);
+    this.clearApiErrors();
+
+    const extract = options?.extractError ?? ((err: any) => err?.error ?? err);
+
+    return source.pipe(
+      tap(() => {
+        this._isSubmitting.set(false);
+        this.enable();
+      }),
+      catchError((err) => {
+        this._isSubmitting.set(false);
+        this.enable();
+        this.applyApiErrors(extract(err));
+        throw err;
+      })
+    );
   }
 
   // ---- Public API - Form State Management ----
@@ -376,8 +430,8 @@ export class FormBridge {
         const errorKey = this._resolveErrorKey(fieldError.constraint);
         const message = this._resolveMessage(fieldError);
         const currentErrors = this._mergeErrors ? (nestedControl.errors ?? {}) : {};
-        nestedControl.setErrors({ ...currentErrors, [errorKey]: message });
         nestedControl.markAsTouched();
+        nestedControl.setErrors({ ...currentErrors, [errorKey]: message });
         resolved.push({ field: fieldError.field, errorKey, message });
         continue;
       }
@@ -389,8 +443,8 @@ export class FormBridge {
 
       const finalErrorKey = errorKey || 'generic';
       const currentErrors = this._mergeErrors ? (control.errors ?? {}) : {};
-      control.setErrors({ ...currentErrors, [finalErrorKey]: message });
       control.markAsTouched();
+      control.setErrors({ ...currentErrors, [finalErrorKey]: message });
 
       resolved.push({ field: fieldError.field, errorKey: finalErrorKey, message });
     }

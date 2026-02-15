@@ -40,6 +40,7 @@ bridge.applyApiErrors(err.error);
 - **SSR compatible** - no browser-only APIs
 - **Tree-shakeable** - import only what you need
 - **Error directive** - `ngxFormError` for declarative error display in templates
+- **Submit state management** - `handleSubmit()` wraps API calls, disables form, applies errors on failure
 - **Extensible** - custom presets, interceptors, constraint maps
 - **Zero dependencies** - only Angular as peer dependency
 
@@ -169,6 +170,7 @@ const bridge = createFormBridge(form, {
 | `enable(options?)` | `void` | Enable controls (supports `except` list) |
 | `disable(options?)` | `void` | Disable controls (supports `except` list) |
 | `toFormData(values?)` | `FormData` | Convert form values to FormData |
+| `handleSubmit(source)` | `Observable<T>` | Wrap an Observable: disable form, apply errors on failure, re-enable |
 | `addInterceptor(fn)` | `void` | Register an error interceptor |
 | `checkDirty()` | `boolean` | Check if form differs from defaults |
 
@@ -180,6 +182,7 @@ const bridge = createFormBridge(form, {
 | `firstErrorSignal` | `Signal<FirstError \| null>` | First error, or null |
 | `hasErrorsSignal` | `Signal<boolean>` | Whether any API errors exist |
 | `isDirtySignal` | `Signal<boolean>` | Whether form changed from defaults |
+| `isSubmittingSignal` | `Signal<boolean>` | Whether a submit is in progress (via handleSubmit) |
 
 ### Configuration
 
@@ -216,6 +219,43 @@ const bridge = createFormBridge(form, {
       return this.translate.instant(`errors.${field}.${constraint}`);
     }
   }
+});
+```
+
+### Submit and Loading State
+
+`handleSubmit()` wraps an Observable (typically an HTTP call) and handles the full submit lifecycle: disabling the form, tracking loading state via `isSubmittingSignal`, and applying API errors on failure.
+
+```typescript
+onSubmit() {
+  this.bridge.handleSubmit(
+    this.http.post('/api/save', this.form.value)
+  ).subscribe({
+    next: () => this.router.navigate(['/success']),
+    error: () => {
+      // form is re-enabled, errors are applied automatically
+    },
+  });
+}
+```
+
+In the template:
+
+```html
+<button [disabled]="bridge.isSubmittingSignal()">
+  @if (bridge.isSubmittingSignal()) {
+    Sending...
+  } @else {
+    Submit
+  }
+</button>
+```
+
+By default, the error body is extracted using `err.error` (matching Angular's HttpErrorResponse). You can customize this:
+
+```typescript
+bridge.handleSubmit(source, {
+  extractError: (err) => (err as any).data.errors,
 });
 ```
 

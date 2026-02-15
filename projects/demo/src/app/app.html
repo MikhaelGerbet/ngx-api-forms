@@ -72,7 +72,7 @@
             </div>
             <div class="form-field">
               <label for="password">Password</label>
-              <input id="password" type="password" formControlName="password" placeholder="••••••••">
+              <input id="password" type="password" formControlName="password" placeholder="--------">
               <span ngxFormError="password" [form]="form" class="field-error"></span>
             </div>
           </form>
@@ -125,6 +125,295 @@
               <span class="signal-value">{{ bridge.errorsSignal().length }}</span>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- Implementation Code -->
+      <div class="code-tabs">
+        <h3>Implementation</h3>
+        <div class="code-block">
+          <div class="code-header">
+            <span>component.ts</span>
+            <button class="copy-btn" (click)="copyToClipboard('bridge = createFormBridge(this.form, {\n  preset: classValidatorPreset(),\n});\n\nsimulateApiError(): void {\n  const result = this.bridge.applyApiErrors(apiResponse);\n}')">Copy</button>
+          </div>
+          <pre><code>bridge = createFormBridge(this.form, &#123;
+  preset: classValidatorPreset(),
+&#125;);
+
+simulateApiError(): void &#123;
+  const result = this.bridge.applyApiErrors(apiResponse);
+  // result: ResolvedFieldError[] - all mapped errors
+&#125;</code></pre>
+        </div>
+        <div class="code-block">
+          <div class="code-header">
+            <span>template.html</span>
+            <button class="copy-btn" (click)="copyToClipboard('<input formControlName=&quot;email&quot; />\n<span ngxFormError=&quot;email&quot; [form]=&quot;form&quot;></span>')">Copy</button>
+          </div>
+          <pre><code>&lt;input formControlName="email" /&gt;
+&lt;span ngxFormError="email" [form]="form"&gt;&lt;/span&gt;
+
+&lt;!-- The directive displays the first error automatically --&gt;
+&lt;!-- Visible only when the control is touched or dirty --&gt;</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- Submit / Loading State Demo -->
+    <section class="demo-section submit-demo">
+      <h2>Submit and Loading State</h2>
+      <p>The <code>handleSubmit()</code> method wraps an Observable, disables the form during the call, and applies API errors automatically on failure.</p>
+
+      <div class="demo-layout">
+        <div class="demo-form-side">
+          <h3>Form with Submit</h3>
+          <form [formGroup]="submitForm" class="sample-form">
+            <div class="form-field">
+              <label for="submit-email">Email</label>
+              <input id="submit-email" type="email" formControlName="email">
+              <span ngxFormError="email" [form]="submitForm" class="field-error"></span>
+            </div>
+            <div class="form-field">
+              <label for="submit-name">Name</label>
+              <input id="submit-name" type="text" formControlName="name">
+              <span ngxFormError="name" [form]="submitForm" class="field-error"></span>
+            </div>
+          </form>
+
+          <div class="demo-controls">
+            <div class="toggle-row">
+              <label>
+                <input type="checkbox" [checked]="submitShouldFail()" (change)="submitShouldFail.set($any($event.target).checked)">
+                Simulate failure (returns validation errors)
+              </label>
+            </div>
+            <div class="demo-buttons">
+              <button class="btn btn-primary" (click)="simulateSubmit()" [disabled]="submitBridge.isSubmittingSignal()">
+                @if (submitBridge.isSubmittingSignal()) {
+                  Sending...
+                } @else {
+                  Submit
+                }
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="demo-result-side">
+          <h3>State</h3>
+          <div class="signals-panel">
+            <div class="signal-row">
+              <span class="signal-label">isSubmitting:</span>
+              <span class="signal-value" [class.active]="submitBridge.isSubmittingSignal()">{{ submitBridge.isSubmittingSignal() }}</span>
+            </div>
+            <div class="signal-row">
+              <span class="signal-label">hasErrors:</span>
+              <span class="signal-value" [class.active]="submitBridge.hasErrorsSignal()">{{ submitBridge.hasErrorsSignal() }}</span>
+            </div>
+            <div class="signal-row">
+              <span class="signal-label">form.disabled:</span>
+              <span class="signal-value" [class.active]="submitForm.disabled">{{ submitForm.disabled }}</span>
+            </div>
+          </div>
+          @if (submitResult()) {
+            <h3>Result</h3>
+            <div class="result-panel" [class.resolved]="submitShouldFail()">
+              <pre><code>{{ submitResult() }}</code></pre>
+            </div>
+          }
+        </div>
+      </div>
+
+      <div class="code-tabs">
+        <h3>Implementation</h3>
+        <div class="code-block">
+          <div class="code-header">
+            <span>component.ts</span>
+            <button class="copy-btn" (click)="copyToClipboard('onSubmit() {\n  this.bridge.handleSubmit(\n    this.http.post(\'/api/save\', this.form.value)\n  ).subscribe({\n    next: (result) => this.router.navigate([\'/success\']),\n    error: () => { /* errors already applied to form */ },\n  });\n}')">Copy</button>
+          </div>
+          <pre><code>onSubmit() &#123;
+  // handleSubmit() does everything:
+  //  - disables the form
+  //  - sets isSubmittingSignal to true
+  //  - on success: re-enables the form
+  //  - on error: re-enables + applies errors
+  this.bridge.handleSubmit(
+    this.http.post('/api/save', this.form.value)
+  ).subscribe(&#123;
+    next: (result) =&gt; this.router.navigate(['/success']),
+    error: () =&gt; &#123; /* errors already applied to form */ &#125;,
+  &#125;);
+&#125;</code></pre>
+        </div>
+        <div class="code-block">
+          <div class="code-header">
+            <span>template.html</span>
+            <button class="copy-btn" (click)="copyToClipboard('<button [disabled]=&quot;bridge.isSubmittingSignal()&quot;>\n  @if (bridge.isSubmittingSignal()) {\n    Sending...\n  } @else {\n    Submit\n  }\n</button>')">Copy</button>
+          </div>
+          <pre><code>&lt;button [disabled]="bridge.isSubmittingSignal()"&gt;
+  &#64;if (bridge.isSubmittingSignal()) &#123;
+    Sending...
+  &#125; &#64;else &#123;
+    Submit
+  &#125;
+&lt;/button&gt;</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- i18n Demo -->
+    <section class="demo-section i18n-demo">
+      <h2>Internationalization (i18n)</h2>
+      <p>API errors often come in English from the backend. The library supports two approaches for translating them.</p>
+
+      <div class="demo-layout">
+        <div class="demo-form-side">
+          <h3>i18n Form</h3>
+          <form [formGroup]="i18nForm" class="sample-form">
+            <div class="form-field">
+              <label for="i18n-email">Email</label>
+              <input id="i18n-email" type="text" formControlName="email">
+              <span ngxFormError="email" [form]="i18nForm" class="field-error"></span>
+            </div>
+            <div class="form-field">
+              <label for="i18n-name">Name</label>
+              <input id="i18n-name" type="text" formControlName="name">
+              <span ngxFormError="name" [form]="i18nForm" class="field-error"></span>
+            </div>
+          </form>
+
+          <div class="demo-controls">
+            <div class="toggle-group">
+              <button class="btn" [class.btn-primary]="i18nMode() === 'prefix'" [class.btn-ghost]="i18nMode() !== 'prefix'" (click)="i18nMode.set('prefix')">Key Prefix</button>
+              <button class="btn" [class.btn-primary]="i18nMode() === 'resolver'" [class.btn-ghost]="i18nMode() !== 'resolver'" (click)="i18nMode.set('resolver')">Custom Resolver</button>
+            </div>
+            <div class="demo-buttons">
+              <button class="btn btn-primary" (click)="simulateI18n()">Apply i18n Errors</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="demo-result-side">
+          <h3>How it works</h3>
+          @if (i18nMode() === 'prefix') {
+            <div class="info-box">
+              <p>With <code>i18n.prefix</code>, error messages become translation keys:</p>
+              <p><code>"email must be valid"</code> becomes <code>"validation.email.isEmail"</code></p>
+              <p>Feed these keys to your i18n library (ngx-translate, transloco, etc).</p>
+            </div>
+          } @else {
+            <div class="info-box">
+              <p>With <code>i18n.resolver</code>, you provide a callback that returns the translated message:</p>
+              <p><code>"email.isEmail"</code> resolves to <code>"L'email n'est pas valide"</code></p>
+              <p>Full control over the translation logic.</p>
+            </div>
+          }
+
+          @if (i18nResult()) {
+            <h3>Resolved Errors</h3>
+            <div class="result-panel resolved">
+              <pre><code>{{ i18nResult() }}</code></pre>
+            </div>
+          }
+        </div>
+      </div>
+
+      <div class="code-tabs">
+        <h3>Implementation</h3>
+        @if (i18nMode() === 'prefix') {
+          <div class="code-block">
+            <div class="code-header">
+              <span>Prefix mode</span>
+              <button class="copy-btn" (click)="copyToClipboard('bridge = createFormBridge(this.form, {\n  preset: classValidatorPreset(),\n  i18n: { prefix: \'validation\' },\n});')">Copy</button>
+            </div>
+            <pre><code>bridge = createFormBridge(this.form, &#123;
+  preset: classValidatorPreset(),
+  i18n: &#123; prefix: 'validation' &#125;,
+&#125;);
+
+// Error messages become keys like:
+//   "validation.email.isEmail"
+//   "validation.name.isNotEmpty"
+// Use with your i18n pipe or service</code></pre>
+          </div>
+        } @else {
+          <div class="code-block">
+            <div class="code-header">
+              <span>Resolver mode</span>
+              <button class="copy-btn" (click)="copyToClipboard('bridge = createFormBridge(this.form, {\n  preset: classValidatorPreset(),\n  i18n: {\n    resolver: (field, constraint, originalMessage) => {\n      return this.translate.instant(`errors.${field}.${constraint}`);\n    },\n  },\n});')">Copy</button>
+            </div>
+            <pre><code>bridge = createFormBridge(this.form, &#123;
+  preset: classValidatorPreset(),
+  i18n: &#123;
+    resolver: (field, constraint, originalMessage) =&gt; &#123;
+      // Use any i18n service here
+      return this.translate.instant(`errors.$&#123;field&#125;.$&#123;constraint&#125;`);
+    &#125;,
+  &#125;,
+&#125;);</code></pre>
+          </div>
+        }
+      </div>
+    </section>
+
+    <!-- Custom JSON Demo -->
+    <section class="demo-section custom-demo">
+      <h2>Custom Error Payload</h2>
+      <p>Paste your own API error response below and see how the library parses it.</p>
+
+      <div class="demo-layout">
+        <div class="demo-form-side">
+          <h3>Your JSON Payload</h3>
+          <textarea class="json-input" [value]="customJson()" (input)="customJson.set($any($event.target).value)" rows="10" spellcheck="false"></textarea>
+
+          <div class="demo-controls">
+            <div class="preset-selector">
+              <label>Preset:</label>
+              <select [value]="customPreset()" (change)="customPreset.set($any($event.target).value)">
+                <option value="class-validator">NestJS / class-validator</option>
+                <option value="laravel">Laravel</option>
+                <option value="django">Django REST</option>
+                <option value="zod">Zod</option>
+              </select>
+            </div>
+            <div class="demo-buttons">
+              <button class="btn btn-primary" (click)="applyCustomJson()">Parse and Apply</button>
+              <button class="btn btn-secondary" (click)="clearCustom()">Clear</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="demo-result-side">
+          <h3>Target Form</h3>
+          <form [formGroup]="customJsonForm" class="sample-form">
+            <div class="form-field">
+              <label>email</label>
+              <input type="text" formControlName="email" readonly>
+              <span ngxFormError="email" [form]="customJsonForm" class="field-error"></span>
+            </div>
+            <div class="form-field">
+              <label>name</label>
+              <input type="text" formControlName="name" readonly>
+              <span ngxFormError="name" [form]="customJsonForm" class="field-error"></span>
+            </div>
+            <div class="form-field">
+              <label>age</label>
+              <input type="number" formControlName="age" readonly>
+              <span ngxFormError="age" [form]="customJsonForm" class="field-error"></span>
+            </div>
+            <div class="form-field">
+              <label>password</label>
+              <input type="text" formControlName="password" readonly>
+              <span ngxFormError="password" [form]="customJsonForm" class="field-error"></span>
+            </div>
+          </form>
+
+          @if (customResult()) {
+            <h3>Parsed Result</h3>
+            <div class="result-panel resolved">
+              <pre><code>{{ customResult() }}</code></pre>
+            </div>
+          }
         </div>
       </div>
     </section>
@@ -218,6 +507,7 @@ export class MyComponent &#123;
           </thead>
           <tbody>
             <tr><td><code>applyApiErrors(error)</code></td><td><code>ResolvedFieldError[]</code></td><td>Parse and apply API errors to form controls</td></tr>
+            <tr><td><code>handleSubmit(source)</code></td><td><code>Observable&lt;T&gt;</code></td><td>Wrap an Observable: disable form, apply errors on failure, re-enable</td></tr>
             <tr><td><code>clearApiErrors()</code></td><td><code>void</code></td><td>Clear all API errors, restore client validation</td></tr>
             <tr><td><code>getFirstError()</code></td><td><code>FirstError | null</code></td><td>Get the first error across all controls</td></tr>
             <tr><td><code>getFieldErrors(field)</code></td><td><code>ValidationErrors | null</code></td><td>Get errors for a specific field</td></tr>
@@ -242,6 +532,7 @@ export class MyComponent &#123;
             <tr><td><code>firstErrorSignal</code></td><td><code>Signal&lt;FirstError | null&gt;</code></td><td>First error or null</td></tr>
             <tr><td><code>hasErrorsSignal</code></td><td><code>Signal&lt;boolean&gt;</code></td><td>Whether any API errors exist</td></tr>
             <tr><td><code>isDirtySignal</code></td><td><code>Signal&lt;boolean&gt;</code></td><td>Whether form changed from defaults</td></tr>
+            <tr><td><code>isSubmittingSignal</code></td><td><code>Signal&lt;boolean&gt;</code></td><td>Whether a submit is in progress (via handleSubmit)</td></tr>
           </tbody>
         </table>
       </div>
@@ -257,6 +548,19 @@ export class MyComponent &#123;
             <tr><td><code>laravelPreset()</code></td><td>Laravel</td><td><code>&#123; errors: &#123; field: [msgs] &#125; &#125;</code></td></tr>
             <tr><td><code>djangoPreset()</code></td><td>Django REST</td><td><code>&#123; field: [msgs] &#125;</code></td></tr>
             <tr><td><code>zodPreset()</code></td><td>Zod</td><td><code>&#123; fieldErrors: &#123;...&#125; &#125;</code> or <code>&#123; issues: [...] &#125;</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>i18n Configuration</h3>
+      <div class="api-table-wrapper">
+        <table class="api-table">
+          <thead>
+            <tr><th>Option</th><th>Type</th><th>Description</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>i18n.prefix</code></td><td><code>string</code></td><td>Prefix for translation keys (e.g. "validation" produces "validation.email.isEmail")</td></tr>
+            <tr><td><code>i18n.resolver</code></td><td><code>(field, constraint, msg) =&gt; string | null</code></td><td>Custom resolver function for full control over translation</td></tr>
           </tbody>
         </table>
       </div>

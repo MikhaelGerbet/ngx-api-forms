@@ -1,6 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { JsonPipe } from '@angular/common';
+import { Observable } from 'rxjs';
 import {
   createFormBridge,
   classValidatorPreset,
@@ -32,6 +33,55 @@ export class App {
   bridge = createFormBridge(this.form, {
     preset: classValidatorPreset(),
   });
+
+  // ---- i18n Demo Form ----
+  i18nForm = this.fb.group({
+    email: [''],
+    name: [''],
+  });
+
+  i18nBridge = createFormBridge(this.i18nForm, {
+    preset: classValidatorPreset(),
+    i18n: { prefix: 'validation' },
+  });
+
+  i18nMode = signal<'prefix' | 'resolver'>('prefix');
+  i18nResult = signal<string>('');
+
+  // ---- Submit Demo Form ----
+  submitForm = this.fb.group({
+    email: ['user@test.com'],
+    name: ['John'],
+  });
+
+  submitBridge = createFormBridge(this.submitForm, {
+    preset: classValidatorPreset(),
+  });
+
+  submitResult = signal<string>('');
+  submitShouldFail = signal<boolean>(true);
+
+  // ---- Custom JSON Demo ----
+  customJsonForm = this.fb.group({
+    email: [''],
+    name: [''],
+    age: [null as number | null],
+    password: [''],
+  });
+
+  customJsonBridge = createFormBridge(this.customJsonForm, {
+    preset: classValidatorPreset(),
+  });
+
+  customJson = signal<string>(JSON.stringify({
+    statusCode: 400,
+    message: [
+      { property: 'email', constraints: { isEmail: 'email must be a valid email' } }
+    ]
+  }, null, 2));
+
+  customPreset = signal<string>('class-validator');
+  customResult = signal<string>('');
 
   // ---- Simulated API errors ----
   readonly mockErrors: Record<string, unknown> = {
@@ -82,11 +132,12 @@ export class App {
   lastResult = signal<string>('');
   formErrorsDisplay = signal<string>('{}');
 
+  // ---- Interactive Demo ----
+
   simulateApiError(): void {
     const key = this.selectedMockKey();
     const error = this.mockErrors[key];
 
-    // Select the right preset
     let preset;
     if (key.startsWith('class-validator')) preset = classValidatorPreset();
     else if (key === 'laravel') preset = laravelPreset();
@@ -110,6 +161,105 @@ export class App {
     this.lastResult.set('');
     this._refreshFormErrors();
   }
+
+  // ---- i18n Demo ----
+
+  simulateI18n(): void {
+    const mode = this.i18nMode();
+    const apiError = {
+      statusCode: 400,
+      message: [
+        { property: 'email', constraints: { isEmail: 'email must be a valid email' } },
+        { property: 'name', constraints: { isNotEmpty: 'name should not be empty' } },
+      ],
+    };
+
+    if (mode === 'prefix') {
+      this.i18nBridge = createFormBridge(this.i18nForm, {
+        preset: classValidatorPreset(),
+        i18n: { prefix: 'validation' },
+      });
+    } else {
+      // Custom resolver: translate error messages
+      const translations: Record<string, string> = {
+        'email.isEmail': 'L\'email n\'est pas valide',
+        'name.isNotEmpty': 'Le nom est obligatoire',
+      };
+      this.i18nBridge = createFormBridge(this.i18nForm, {
+        preset: classValidatorPreset(),
+        i18n: {
+          resolver: (field, constraint, _msg) => {
+            return translations[`${field}.${constraint}`] ?? null;
+          },
+        },
+      });
+    }
+
+    const result = this.i18nBridge.applyApiErrors(apiError);
+    this.i18nResult.set(JSON.stringify(result, null, 2));
+  }
+
+  // ---- Submit Demo ----
+
+  simulateSubmit(): void {
+    const shouldFail = this.submitShouldFail();
+    this.submitResult.set('');
+
+    const mockApiCall$ = new Observable<{ success: boolean }>(subscriber => {
+      const timer = setTimeout(() => {
+        if (shouldFail) {
+          subscriber.error({
+            error: {
+              statusCode: 400,
+              message: [
+                { property: 'email', constraints: { isEmail: 'email must be a valid email' } },
+              ],
+            },
+          });
+        } else {
+          subscriber.next({ success: true });
+          subscriber.complete();
+        }
+      }, 1500);
+      return () => clearTimeout(timer);
+    });
+
+    this.submitBridge.handleSubmit(mockApiCall$).subscribe({
+      next: (result) => {
+        this.submitResult.set('Success: ' + JSON.stringify(result));
+      },
+      error: () => {
+        this.submitResult.set('Error handled - form re-enabled, errors applied');
+      },
+    });
+  }
+
+  // ---- Custom JSON Demo ----
+
+  applyCustomJson(): void {
+    try {
+      const parsed = JSON.parse(this.customJson());
+      let preset;
+      const key = this.customPreset();
+      if (key === 'class-validator') preset = classValidatorPreset();
+      else if (key === 'laravel') preset = laravelPreset();
+      else if (key === 'django') preset = djangoPreset();
+      else preset = zodPreset();
+
+      this.customJsonBridge = createFormBridge(this.customJsonForm, { preset });
+      const result = this.customJsonBridge.applyApiErrors(parsed);
+      this.customResult.set(JSON.stringify(result, null, 2));
+    } catch (e) {
+      this.customResult.set('Invalid JSON');
+    }
+  }
+
+  clearCustom(): void {
+    this.customJsonBridge.clearApiErrors();
+    this.customResult.set('');
+  }
+
+  // ---- Utils ----
 
   private _refreshFormErrors(): void {
     const errors: Record<string, unknown> = {};

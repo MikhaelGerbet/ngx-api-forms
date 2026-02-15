@@ -1,4 +1,5 @@
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { of, throwError, delay } from 'rxjs';
 import { FormBridge, createFormBridge } from './form-bridge';
 import { classValidatorPreset } from '../presets/class-validator.preset';
 import { laravelPreset } from '../presets/laravel.preset';
@@ -421,6 +422,129 @@ describe('FormBridge', () => {
 
       expect(form.controls['email'].hasError('customError')).toBeTrue();
       expect(form.controls['email'].hasError('email')).toBeTrue();
+    });
+  });
+
+  describe('isSubmittingSignal', () => {
+    it('should start as false', () => {
+      const bridge = createFormBridge(form, { preset: classValidatorPreset() });
+      expect(bridge.isSubmittingSignal()).toBeFalse();
+    });
+  });
+
+  describe('handleSubmit', () => {
+    it('should set isSubmittingSignal to true during submit', () => {
+      const bridge = createFormBridge(form, { preset: classValidatorPreset() });
+      let isSubmittingDuringCall = false;
+
+      bridge.handleSubmit(of({ ok: true })).subscribe({
+        next: () => {
+          // After success, isSubmitting should already be false
+        },
+      });
+
+      // After the synchronous observable completes, isSubmitting is false
+      expect(bridge.isSubmittingSignal()).toBeFalse();
+    });
+
+    it('should disable form during submit and re-enable on success', () => {
+      const bridge = createFormBridge(form, { preset: classValidatorPreset() });
+
+      bridge.handleSubmit(of({ ok: true })).subscribe();
+
+      // After synchronous completion, form should be re-enabled
+      expect(form.enabled).toBeTrue();
+    });
+
+    it('should apply API errors on failure and re-enable form', () => {
+      const bridge = createFormBridge(form, { preset: classValidatorPreset() });
+      const apiError = {
+        error: {
+          statusCode: 400,
+          message: [
+            { property: 'email', constraints: { isEmail: 'email must be valid' } },
+          ],
+        },
+      };
+
+      bridge.handleSubmit(throwError(() => apiError)).subscribe({
+        error: () => { /* expected */ },
+      });
+
+      expect(form.enabled).toBeTrue();
+      expect(bridge.isSubmittingSignal()).toBeFalse();
+      expect(form.controls['email'].hasError('email')).toBeTrue();
+    });
+
+    it('should re-throw the error for subscriber handling', () => {
+      const bridge = createFormBridge(form, { preset: classValidatorPreset() });
+      let caughtError: unknown = null;
+
+      bridge.handleSubmit(throwError(() => new Error('test'))).subscribe({
+        error: (err) => { caughtError = err; },
+      });
+
+      expect(caughtError).toBeInstanceOf(Error);
+      expect((caughtError as Error).message).toBe('test');
+    });
+
+    it('should use custom extractError when provided', () => {
+      const bridge = createFormBridge(form, { preset: classValidatorPreset() });
+      const apiError = {
+        data: {
+          statusCode: 400,
+          message: [
+            { property: 'email', constraints: { isEmail: 'bad' } },
+          ],
+        },
+      };
+
+      bridge.handleSubmit(
+        throwError(() => apiError),
+        { extractError: (err: any) => err.data }
+      ).subscribe({
+        error: () => { /* expected */ },
+      });
+
+      expect(form.controls['email'].hasError('email')).toBeTrue();
+    });
+
+    it('should clear api errors before each submit', () => {
+      const bridge = createFormBridge(form, { preset: classValidatorPreset() });
+      const apiError = {
+        error: {
+          message: [
+            { property: 'email', constraints: { isEmail: 'bad' } },
+          ],
+        },
+      };
+
+      // First submit - apply errors
+      bridge.handleSubmit(throwError(() => apiError)).subscribe({ error: () => {} });
+      expect(bridge.hasErrorsSignal()).toBeTrue();
+
+      // Second submit - success should clear errors
+      bridge.handleSubmit(of({ ok: true })).subscribe();
+      expect(bridge.hasErrorsSignal()).toBeFalse();
+    });
+  });
+
+  describe('markAsTouched before setErrors (double-click fix)', () => {
+    it('should have touched=true when statusChanges fires', () => {
+      const bridge = createFormBridge(form, { preset: classValidatorPreset() });
+      let wasTouchedOnStatusChange = false;
+
+      form.controls['email'].statusChanges.subscribe(() => {
+        wasTouchedOnStatusChange = form.controls['email'].touched;
+      });
+
+      bridge.applyApiErrors({
+        message: [
+          { property: 'email', constraints: { isEmail: 'bad email' } },
+        ],
+      });
+
+      expect(wasTouchedOnStatusChange).toBeTrue();
     });
   });
 });
