@@ -63,8 +63,6 @@ function parseStringMessage(message: string): ApiFieldError[] {
     { regex: /^(\w+) is already taken/i, constraint: 'unique' },
     { regex: /^(\w+) is already used/i, constraint: 'unique' },
     { regex: /^(\w+) must be a valid decimal/i, constraint: 'isDecimal' },
-    { regex: /^Email is already used/i, constraint: 'unique' },
-    { regex: /^File url is already used/i, constraint: 'unique' },
   ];
 
   for (const { regex, constraint } of patterns) {
@@ -77,14 +75,8 @@ function parseStringMessage(message: string): ApiFieldError[] {
     }
   }
 
-  // Special cases with specific field mapping
-  if (/email is already used/i.test(message)) {
-    return [{ field: 'email', constraint: 'unique', message }];
-  }
-  if (/file url is already used/i.test(message)) {
-    return [{ field: 'url', constraint: 'unique', message }];
-  }
-  if (/file is required/i.test(message)) {
+  // Specific messages without a field name captured by regex
+  if (/^file is required/i.test(message)) {
     return [{ field: 'file', constraint: 'required', message }];
   }
 

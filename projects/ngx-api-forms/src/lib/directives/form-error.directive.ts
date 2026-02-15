@@ -27,7 +27,7 @@ import {
   inject,
 } from '@angular/core';
 import { FormGroup, AbstractControl } from '@angular/forms';
-import { Subscription } from 'rxjs';
+import { Subscription, merge } from 'rxjs';
 
 @Directive({
   selector: '[ngxFormError]',
@@ -72,7 +72,7 @@ export class NgxFormErrorDirective implements OnInit, OnDestroy {
     }
 
     // Listen to status and value changes
-    this.subscription = control.statusChanges.subscribe(() => {
+    this.subscription = merge(control.statusChanges, control.valueChanges).subscribe(() => {
       this._updateDisplay(control);
     });
 

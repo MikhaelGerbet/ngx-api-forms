@@ -1,5 +1,5 @@
 /**
- * NgxApiFormsService — Injectable Angular service.
+ * NgxApiFormsService - Injectable Angular service.
  *
  * Provides a factory for creating FormBridge instances.
  * Use this in components that need DI integration.

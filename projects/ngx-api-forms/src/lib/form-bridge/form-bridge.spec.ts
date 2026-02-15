@@ -38,7 +38,7 @@ describe('FormBridge', () => {
     });
   });
 
-  describe('applyApiErrors — class-validator', () => {
+  describe('applyApiErrors - class-validator', () => {
     let bridge: FormBridge;
 
     beforeEach(() => {
@@ -129,7 +129,7 @@ describe('FormBridge', () => {
     });
   });
 
-  describe('applyApiErrors — Laravel', () => {
+  describe('applyApiErrors - Laravel', () => {
     let bridge: FormBridge;
 
     beforeEach(() => {
@@ -151,7 +151,7 @@ describe('FormBridge', () => {
     });
   });
 
-  describe('applyApiErrors — Django', () => {
+  describe('applyApiErrors - Django', () => {
     let bridge: FormBridge;
 
     beforeEach(() => {
@@ -178,7 +178,7 @@ describe('FormBridge', () => {
     });
   });
 
-  describe('applyApiErrors — Zod', () => {
+  describe('applyApiErrors - Zod', () => {
     let bridge: FormBridge;
 
     beforeEach(() => {
@@ -209,7 +209,7 @@ describe('FormBridge', () => {
     });
   });
 
-  describe('applyApiErrors — multi-preset fallback', () => {
+  describe('applyApiErrors - multi-preset fallback', () => {
     it('should try presets in order', () => {
       const bridge = createFormBridge(form, {
         preset: [zodPreset(), classValidatorPreset()],
@@ -237,10 +237,12 @@ describe('FormBridge', () => {
       });
 
       expect(form.controls['email'].errors).toBeTruthy();
+      expect(form.controls['email'].errors!['email']).toBeTruthy();
 
       bridge.clearApiErrors();
 
-      expect(form.controls['email'].errors).toBeNull();
+      // API error (email) is cleared; client-side validator (required) is restored
+      expect(form.controls['email'].errors?.['email']).toBeFalsy();
       expect(bridge.errorsSignal().length).toBe(0);
     });
   });
@@ -262,7 +264,9 @@ describe('FormBridge', () => {
     });
 
     it('should return null when no errors', () => {
-      const bridge = createFormBridge(form);
+      // Use a form without validators to test "no errors" state
+      const cleanForm = new FormBuilder().group({ email: [''], name: [''] });
+      const bridge = createFormBridge(cleanForm);
       expect(bridge.getFirstError()).toBeNull();
     });
   });

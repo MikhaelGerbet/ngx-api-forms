@@ -31,6 +31,18 @@ interface ZodIssue {
   validation?: string;
 }
 
+function inferConstraintFromMessage(message: string): string {
+  const lower = message.toLowerCase();
+  if (lower.includes('required') || lower.includes('invalid_type')) return 'required';
+  if (lower.includes('email')) return 'email';
+  if (lower.includes('url')) return 'url';
+  if (lower.includes('at least') || lower.includes('too_small') || lower.includes('must contain at least')) return 'minlength';
+  if (lower.includes('at most') || lower.includes('too_big') || lower.includes('must contain at most')) return 'maxlength';
+  if (lower.includes('greater than or equal')) return 'min';
+  if (lower.includes('less than or equal')) return 'max';
+  return 'invalid';
+}
+
 function zodCodeToConstraint(issue: ZodIssue): string {
   switch (issue.code) {
     case 'too_small':
@@ -80,7 +92,7 @@ export function zodPreset(): ErrorPreset {
           if (!Array.isArray(messages)) continue;
           for (const message of messages) {
             if (typeof message !== 'string') continue;
-            result.push({ field, constraint: 'invalid', message });
+            result.push({ field, constraint: inferConstraintFromMessage(message), message });
           }
         }
         return result;

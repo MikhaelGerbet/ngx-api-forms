@@ -1,5 +1,5 @@
 /**
- * ngx-api-forms — Models & Interfaces
+ * ngx-api-forms - Models & Interfaces
  *
  * Core types for bridging API validation errors to Angular Reactive Forms.
  */

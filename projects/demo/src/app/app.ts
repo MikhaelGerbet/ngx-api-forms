@@ -33,9 +33,6 @@ export class App {
     preset: classValidatorPreset(),
   });
 
-  // ---- Preset Selection ----
-  activePreset = signal<string>('class-validator');
-
   // ---- Simulated API errors ----
   readonly mockErrors: Record<string, unknown> = {
     'class-validator': {
@@ -83,6 +80,7 @@ export class App {
 
   selectedMockKey = signal<string>('class-validator');
   lastResult = signal<string>('');
+  formErrorsDisplay = signal<string>('{}');
 
   simulateApiError(): void {
     const key = this.selectedMockKey();
@@ -98,19 +96,22 @@ export class App {
     this.bridge = createFormBridge(this.form, { preset });
     const result = this.bridge.applyApiErrors(error);
     this.lastResult.set(JSON.stringify(result, null, 2));
+    this._refreshFormErrors();
   }
 
   clearErrors(): void {
     this.bridge.clearApiErrors();
     this.lastResult.set('');
+    this._refreshFormErrors();
   }
 
   resetForm(): void {
     this.bridge.reset();
     this.lastResult.set('');
+    this._refreshFormErrors();
   }
 
-  getFormErrors(): string {
+  private _refreshFormErrors(): void {
     const errors: Record<string, unknown> = {};
     for (const key of Object.keys(this.form.controls)) {
       const control = this.form.get(key);
@@ -118,7 +119,7 @@ export class App {
         errors[key] = control.errors;
       }
     }
-    return JSON.stringify(errors, null, 2);
+    this.formErrorsDisplay.set(JSON.stringify(errors, null, 2));
   }
 
   copyToClipboard(text: string): void {

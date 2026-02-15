@@ -1,5 +1,5 @@
 /**
- * FormBridge — The core class of ngx-api-forms.
+ * FormBridge - The core class of ngx-api-forms.
  *
  * Bridges API validation errors to Angular Reactive Forms with:
  * - Automatic error parsing via presets (class-validator, Laravel, Django, Zod)
@@ -25,6 +25,17 @@ import {
   ResolvedFieldError,
 } from '../models/api-forms.models';
 import { CLASS_VALIDATOR_CONSTRAINT_MAP, classValidatorPreset } from '../presets/class-validator.preset';
+import { LARAVEL_CONSTRAINT_MAP } from '../presets/laravel.preset';
+import { DJANGO_CONSTRAINT_MAP } from '../presets/django.preset';
+import { ZOD_CONSTRAINT_MAP } from '../presets/zod.preset';
+
+/** Maps preset names to their default constraint maps */
+const PRESET_CONSTRAINT_MAPS: Record<string, ConstraintMap> = {
+  'class-validator': CLASS_VALIDATOR_CONSTRAINT_MAP,
+  laravel: LARAVEL_CONSTRAINT_MAP,
+  django: DJANGO_CONSTRAINT_MAP,
+  zod: ZOD_CONSTRAINT_MAP,
+};
 
 /**
  * FormBridge wraps an Angular FormGroup and provides a clean API
@@ -90,9 +101,10 @@ export class FormBridge {
       this._presets = [classValidatorPreset()];
     }
 
-    // Build constraint map: defaults + custom overrides
+    // Build constraint map: preset defaults + custom overrides
+    const presetDefaults = this._resolvePresetConstraintMap(this._presets);
     this._constraintMap = {
-      ...CLASS_VALIDATOR_CONSTRAINT_MAP,
+      ...presetDefaults,
       ...(config?.constraintMap ?? {}),
     };
 
@@ -100,7 +112,7 @@ export class FormBridge {
     this._captureDefaults();
   }
 
-  // ---- Public API — Error Management ----
+  // ---- Public API - Error Management ----
 
   /**
    * Parse and apply API validation errors to the form.
@@ -193,7 +205,7 @@ export class FormBridge {
     this._interceptors.push(interceptor);
   }
 
-  // ---- Public API — Form State Management ----
+  // ---- Public API - Form State Management ----
 
   /**
    * Set default values for the form and reset to them.
@@ -262,7 +274,7 @@ export class FormBridge {
     return { ...this._defaultValues };
   }
 
-  // ---- Public API — Utilities ----
+  // ---- Public API - Utilities ----
 
   /**
    * Convert form values to FormData (for file uploads).
@@ -331,6 +343,19 @@ export class FormBridge {
 
   // ---- Private Methods ----
 
+  private _resolvePresetConstraintMap(presets: ErrorPreset[]): ConstraintMap {
+    const merged: ConstraintMap = {};
+    for (const preset of presets) {
+      const map = PRESET_CONSTRAINT_MAPS[preset.name];
+      if (map) Object.assign(merged, map);
+    }
+    // If no preset maps found, fall back to class-validator
+    if (Object.keys(merged).length === 0) {
+      Object.assign(merged, CLASS_VALIDATOR_CONSTRAINT_MAP);
+    }
+    return merged;
+  }
+
   private _captureDefaults(): void {
     const rawValues = this._form.getRawValue();
     for (const [key, value] of Object.entries(rawValues)) {
@@ -352,6 +377,7 @@ export class FormBridge {
         const message = this._resolveMessage(fieldError);
         const currentErrors = this._mergeErrors ? (nestedControl.errors ?? {}) : {};
         nestedControl.setErrors({ ...currentErrors, [errorKey]: message });
+        nestedControl.markAsTouched();
         resolved.push({ field: fieldError.field, errorKey, message });
         continue;
       }
@@ -364,6 +390,7 @@ export class FormBridge {
       const finalErrorKey = errorKey || 'generic';
       const currentErrors = this._mergeErrors ? (control.errors ?? {}) : {};
       control.setErrors({ ...currentErrors, [finalErrorKey]: message });
+      control.markAsTouched();
 
       resolved.push({ field: fieldError.field, errorKey: finalErrorKey, message });
     }
@@ -389,7 +416,13 @@ export class FormBridge {
   }
 
   private _resolveErrorKey(constraint: string): string {
-    return this._constraintMap[constraint] ?? constraint;
+    // If constraint is in the map, use the mapped value.
+    // Otherwise, use the constraint as-is (pass-through).
+    // This returns '' only when constraint is empty.
+    if (this._constraintMap[constraint] !== undefined) {
+      return this._constraintMap[constraint];
+    }
+    return constraint;
   }
 
   private _resolveMessage(error: ApiFieldError): string {

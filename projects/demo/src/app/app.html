@@ -10,7 +10,7 @@
 
   <header class="demo-header">
     <h1>ngx-api-forms</h1>
-    <p class="tagline">Bridge your API validation errors to Angular Reactive Forms — automatically.</p>
+    <p class="tagline">Bridge API validation errors to Angular Reactive Forms, automatically.</p>
     <div class="badges">
       <img src="https://img.shields.io/npm/v/ngx-api-forms?style=flat-square" alt="npm version">
       <img src="https://img.shields.io/npm/l/ngx-api-forms?style=flat-square" alt="license">
@@ -26,22 +26,18 @@
       <h2>Why ngx-api-forms?</h2>
       <div class="why-grid">
         <div class="why-card">
-          <div class="why-icon">🔌</div>
-          <h3>API ↔ Forms Bridge</h3>
+          <h3>API to Forms Bridge</h3>
           <p>Automatically maps backend validation errors to Angular Reactive Forms controls. No more manual string matching.</p>
         </div>
         <div class="why-card">
-          <div class="why-icon">🎯</div>
           <h3>Multi-Backend Presets</h3>
           <p>Built-in support for NestJS/class-validator, Laravel, Django REST, and Zod. Extensible for any backend.</p>
         </div>
         <div class="why-card">
-          <div class="why-icon">🌍</div>
           <h3>i18n Ready</h3>
           <p>Use translation keys or custom resolvers for error messages. Works with any i18n library.</p>
         </div>
         <div class="why-card">
-          <div class="why-icon">📡</div>
           <h3>Signals Support</h3>
           <p>Built with Angular Signals for reactive error state. <code>errorsSignal</code>, <code>firstErrorSignal</code>, <code>hasErrorsSignal</code>.</p>
         </div>
@@ -102,7 +98,7 @@
         <div class="demo-result-side">
           <h3>Form Errors State</h3>
           <div class="result-panel">
-            <pre><code>{{ getFormErrors() }}</code></pre>
+            <pre><code>{{ formErrorsDisplay() }}</code></pre>
           </div>
 
           @if (lastResult()) {
