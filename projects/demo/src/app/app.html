@@ -10,7 +10,7 @@
 
   <header class="demo-header">
     <h1>ngx-api-forms</h1>
-    <p class="tagline">Bridge API validation errors to Angular Reactive Forms, automatically.</p>
+    <p class="tagline">API error parsing library for Angular. Not a display library -- a parsing library.</p>
     <div class="badges">
       <img src="https://img.shields.io/npm/v/ngx-api-forms?style=flat-square" alt="npm version">
       <img src="https://img.shields.io/npm/l/ngx-api-forms?style=flat-square" alt="license">
@@ -61,14 +61,7 @@ this.http.post('/api', data).subscribe(&#123;
   error: (err) =&gt; bridge.applyApiErrors(err.error)
 &#125;);
 
-// Or with full submit lifecycle:
-bridge.handleSubmit(
-  this.http.post('/api', data)
-).subscribe();
-
-// Switch backend? Change one preset.
-// Typed errors, constraint semantics preserved.
-// Works in interceptors too:
+// Or without a form (interceptors, stores, effects):
 // parseApiErrors(err.error, laravelPreset());</code></pre>
         </div>
       </div>
@@ -84,7 +77,7 @@ bridge.handleSubmit(
         </div>
         <div class="why-card">
           <h3>Native Signals</h3>
-          <p>Reactive error state via <code>errorsSignal</code>, <code>hasErrorsSignal</code>, <code>isDirtySignal</code>, <code>isSubmittingSignal</code>.</p>
+          <p>Reactive error state via <code>errorsSignal</code>, <code>firstErrorSignal</code>, <code>hasErrorsSignal</code>.</p>
         </div>
         <div class="why-card">
           <h3>Zero Dependencies</h3>
@@ -181,9 +174,9 @@ bridge.handleSubmit(
         <div class="code-block">
           <div class="code-header">
             <span>component.ts</span>
-            <button class="copy-btn" (click)="copyToClipboard('bridge = createFormBridge(this.form, {\n  preset: classValidatorPreset(),\n});\n\nsimulateApiError(): void {\n  const result = this.bridge.applyApiErrors(apiResponse);\n}')">Copy</button>
+            <button class="copy-btn" (click)="copyToClipboard('bridge = provideFormBridge(this.form, {\n  preset: classValidatorPreset(),\n});\n\nsimulateApiError(): void {\n  const result = this.bridge.applyApiErrors(apiResponse);\n}')">Copy</button>
           </div>
-          <pre><code>bridge = createFormBridge(this.form, &#123;
+          <pre><code>bridge = provideFormBridge(this.form, &#123;
   preset: classValidatorPreset(),
 &#125;);
 
@@ -209,7 +202,7 @@ simulateApiError(): void &#123;
     <!-- Submit / Loading State Demo -->
     <section class="demo-section submit-demo">
       <h2>Submit and Loading State</h2>
-      <p>The <code>handleSubmit()</code> method wraps an Observable, disables the form during the call, and applies API errors automatically on failure.</p>
+      <p>The standalone <code>wrapSubmit()</code> function handles form disable/enable lifecycle. Pair it with a local signal to track loading state.</p>
 
       <div class="demo-layout">
         <div class="demo-form-side">
@@ -235,8 +228,8 @@ simulateApiError(): void &#123;
               </label>
             </div>
             <div class="demo-buttons">
-              <button class="btn btn-primary" (click)="simulateSubmit()" [disabled]="submitBridge.isSubmittingSignal()">
-                @if (submitBridge.isSubmittingSignal()) {
+              <button class="btn btn-primary" (click)="simulateSubmit()" [disabled]="isSubmitting()">
+                @if (isSubmitting()) {
                   Sending...
                 } @else {
                   Submit
@@ -251,7 +244,7 @@ simulateApiError(): void &#123;
           <div class="signals-panel">
             <div class="signal-row">
               <span class="signal-label">isSubmitting:</span>
-              <span class="signal-value" [class.active]="submitBridge.isSubmittingSignal()">{{ submitBridge.isSubmittingSignal() }}</span>
+              <span class="signal-value" [class.active]="isSubmitting()">{{ isSubmitting() }}</span>
             </div>
             <div class="signal-row">
               <span class="signal-label">hasErrors:</span>
@@ -276,19 +269,18 @@ simulateApiError(): void &#123;
         <div class="code-block">
           <div class="code-header">
             <span>component.ts</span>
-            <button class="copy-btn" (click)="copyToClipboard('onSubmit() {\n  this.bridge.handleSubmit(\n    this.http.post(\'/api/save\', this.form.value)\n  ).subscribe({\n    next: (result) => this.router.navigate([\'/success\']),\n    error: () => { /* errors already applied to form */ },\n  });\n}')">Copy</button>
+            <button class="copy-btn" (click)="copyToClipboard('import { wrapSubmit } from \'ngx-api-forms\';\n\nonSubmit() {\n  this.isSubmitting.set(true);\n  wrapSubmit(this.form, this.http.post(\'/api/save\', this.form.value), {\n    onError: (err) => this.bridge.applyApiErrors(err.error),\n  }).subscribe({\n    next: () => { this.isSubmitting.set(false); },\n    error: () => { this.isSubmitting.set(false); },\n  });\n}')">Copy</button>
           </div>
-          <pre><code>onSubmit() &#123;
-  // handleSubmit() does everything:
-  //  - disables the form
-  //  - sets isSubmittingSignal to true
-  //  - on success: re-enables the form
-  //  - on error: re-enables + applies errors
-  this.bridge.handleSubmit(
-    this.http.post('/api/save', this.form.value)
+          <pre><code>import &#123; wrapSubmit &#125; from 'ngx-api-forms';
+
+onSubmit() &#123;
+  this.isSubmitting.set(true);
+  wrapSubmit(this.form,
+    this.http.post('/api/save', this.form.value),
+    &#123; onError: (err) =&gt; this.bridge.applyApiErrors(err.error) &#125;
   ).subscribe(&#123;
-    next: (result) =&gt; this.router.navigate(['/success']),
-    error: () =&gt; &#123; /* errors already applied to form */ &#125;,
+    next: () =&gt; this.isSubmitting.set(false),
+    error: () =&gt; this.isSubmitting.set(false),
   &#125;);
 &#125;</code></pre>
         </div>
@@ -297,8 +289,8 @@ simulateApiError(): void &#123;
             <span>template.html</span>
             <button class="copy-btn" (click)="copyToClipboard('<button [disabled]=&quot;bridge.isSubmittingSignal()&quot;>\n  @if (bridge.isSubmittingSignal()) {\n    Sending...\n  } @else {\n    Submit\n  }\n</button>')">Copy</button>
           </div>
-          <pre><code>&lt;button [disabled]="bridge.isSubmittingSignal()"&gt;
-  &#64;if (bridge.isSubmittingSignal()) &#123;
+          <pre><code>&lt;button [disabled]="isSubmitting()"&gt;
+  &#64;if (isSubmitting()) &#123;
     Sending...
   &#125; &#64;else &#123;
     Submit
@@ -371,9 +363,9 @@ simulateApiError(): void &#123;
           <div class="code-block">
             <div class="code-header">
               <span>Prefix mode</span>
-              <button class="copy-btn" (click)="copyToClipboard('bridge = createFormBridge(this.form, {\n  preset: classValidatorPreset(),\n  i18n: { prefix: \'validation\' },\n});')">Copy</button>
+              <button class="copy-btn" (click)="copyToClipboard('bridge = provideFormBridge(this.form, {\n  preset: classValidatorPreset(),\n  i18n: { prefix: \'validation\' },\n});')">Copy</button>
             </div>
-            <pre><code>bridge = createFormBridge(this.form, &#123;
+            <pre><code>bridge = provideFormBridge(this.form, &#123;
   preset: classValidatorPreset(),
   i18n: &#123; prefix: 'validation' &#125;,
 &#125;);
@@ -387,9 +379,9 @@ simulateApiError(): void &#123;
           <div class="code-block">
             <div class="code-header">
               <span>Resolver mode</span>
-              <button class="copy-btn" (click)="copyToClipboard('bridge = createFormBridge(this.form, {\n  preset: classValidatorPreset(),\n  i18n: {\n    resolver: (field, constraint, originalMessage) => {\n      return this.translate.instant(`errors.${field}.${constraint}`);\n    },\n  },\n});')">Copy</button>
+              <button class="copy-btn" (click)="copyToClipboard('bridge = provideFormBridge(this.form, {\n  preset: classValidatorPreset(),\n  i18n: {\n    resolver: (field, constraint, originalMessage) => {\n      return this.translate.instant(`errors.${field}.${constraint}`);\n    },\n  },\n});')">Copy</button>
             </div>
-            <pre><code>bridge = createFormBridge(this.form, &#123;
+            <pre><code>bridge = provideFormBridge(this.form, &#123;
   preset: classValidatorPreset(),
   i18n: &#123;
     resolver: (field, constraint, originalMessage) =&gt; &#123;
@@ -406,7 +398,7 @@ simulateApiError(): void &#123;
     <!-- Dirty State & Interceptors Demo -->
     <section class="demo-section dirty-demo">
       <h2>Dirty State & Interceptors</h2>
-      <p>The <code>isDirtySignal</code> updates reactively when form values change. Interceptors can filter or transform errors before they reach the form, and return a dispose function.</p>
+      <p>Track form modifications with Angular's built-in <code>form.dirty</code> or the standalone <code>getDirtyValues()</code>. Interceptors can filter or transform errors before they reach the form, and return a dispose function.</p>
 
       <div class="demo-layout">
         <div class="demo-form-side">
@@ -424,7 +416,7 @@ simulateApiError(): void &#123;
 
           <div class="demo-controls">
             <div class="demo-buttons">
-              <button class="btn btn-secondary" (click)="dirtyBridge.reset()">Reset to Defaults</button>
+              <button class="btn btn-secondary" (click)="dirtyForm.reset({email: 'user@test.com', name: 'John'}); dirtyBridge.clearApiErrors()">Reset to Defaults</button>
               <button class="btn btn-ghost" (click)="toggleInterceptor()">
                 {{ interceptorActive() ? 'Remove Interceptor' : 'Add Interceptor (filter email)' }}
               </button>
@@ -437,8 +429,8 @@ simulateApiError(): void &#123;
           <h3>State</h3>
           <div class="signals-panel">
             <div class="signal-row">
-              <span class="signal-label">isDirty:</span>
-              <span class="signal-value" [class.active]="dirtyBridge.isDirtySignal()">{{ dirtyBridge.isDirtySignal() }}</span>
+              <span class="signal-label">form.dirty:</span>
+              <span class="signal-value" [class.active]="dirtyForm.dirty">{{ dirtyForm.dirty }}</span>
             </div>
             <div class="signal-row">
               <span class="signal-label">hasErrors:</span>
@@ -451,7 +443,7 @@ simulateApiError(): void &#123;
           </div>
 
           <div class="info-box">
-            <p><code>isDirtySignal</code> updates automatically on every value change - no manual <code>checkDirty()</code> call needed.</p>
+            <p>Use Angular's built-in <code>form.dirty</code> for simple dirty tracking, or <code>getDirtyValues(form)</code> to get only the changed fields.</p>
             <p>When the interceptor is active, email errors are filtered out. Use the dispose function to remove it.</p>
           </div>
         </div>
@@ -462,10 +454,14 @@ simulateApiError(): void &#123;
         <div class="code-block">
           <div class="code-header">
             <span>component.ts</span>
-            <button class="copy-btn" (click)="copyToClipboard('// isDirtySignal is reactive - no manual call needed\ntemplate: `{{ bridge.isDirtySignal() }}`\n\n// Interceptors return a dispose function\nconst dispose = bridge.addInterceptor((errors) =>\n  errors.filter(e => e.field !== \'email\')\n);\n// Later: dispose() to remove the interceptor')">Copy</button>
+            <button class="copy-btn" (click)="copyToClipboard('// Dirty tracking with built-in Angular API\nconst isDirty = this.form.dirty;\n\n// Or get only changed values:\nimport { getDirtyValues } from \'ngx-api-forms\';\nconst changed = getDirtyValues(this.form);\n\n// Interceptors return a dispose function\nconst dispose = bridge.addInterceptor((errors) =>\n  errors.filter(e => e.field !== \'email\')\n);\n// Later: dispose() to remove the interceptor')">Copy</button>
           </div>
-          <pre><code>// isDirtySignal is reactive - no manual call needed
-template: `&#123;&#123; bridge.isDirtySignal() &#125;&#125;`
+          <pre><code>// Dirty tracking with built-in Angular API
+const isDirty = this.form.dirty;
+
+// Or get only changed values:
+import &#123; getDirtyValues &#125; from 'ngx-api-forms';
+const changed = getDirtyValues(this.form);
 
 // Interceptors return a dispose function
 const dispose = bridge.addInterceptor((errors) =&gt;
@@ -641,6 +637,14 @@ export const apiErrorInterceptor: HttpInterceptorFn = (req, next) =&gt; &#123;
         </div>
         <pre><code>npm install ngx-api-forms</code></pre>
       </div>
+      <div class="code-block">
+        <div class="code-header">
+          <span>ng add</span>
+          <button class="copy-btn" (click)="copyToClipboard('ng add ngx-api-forms --preset=laravel')">Copy</button>
+        </div>
+        <pre><code>ng add ngx-api-forms --preset=laravel
+# Options: laravel, django, express-validator, spring</code></pre>
+      </div>
     </section>
 
     <!-- Quick Start -->
@@ -649,7 +653,7 @@ export const apiErrorInterceptor: HttpInterceptorFn = (req, next) =&gt; &#123;
 
       <div class="code-block">
         <div class="code-header"><span>component.ts</span></div>
-        <pre><code>import &#123; createFormBridge, classValidatorPreset &#125; from 'ngx-api-forms';
+        <pre><code>import &#123; provideFormBridge, classValidatorPreset &#125; from 'ngx-api-forms';
 
 export class MyComponent &#123;
   form = inject(FormBuilder).group(&#123;
@@ -657,12 +661,13 @@ export class MyComponent &#123;
     name: ['', Validators.minLength(3)],
   &#125;);
 
-  bridge = createFormBridge(this.form, &#123;
+  // Auto-cleanup via DestroyRef -- no manual destroy() needed
+  bridge = provideFormBridge(this.form, &#123;
     preset: classValidatorPreset(),
   &#125;);
 
   onSubmit() &#123;
-    this.api.save(this.form.value).subscribe(&#123;
+    this.http.post('/api', this.form.value).subscribe(&#123;
       error: (err) =&gt; this.bridge.applyApiErrors(err.error),
     &#125;);
   &#125;
@@ -687,7 +692,8 @@ export class MyComponent &#123;
     <section class="demo-section api-ref">
       <h2>API Reference</h2>
 
-      <h3>FormBridge</h3>
+      <h3>FormBridge (core)</h3>
+      <p style="margin-bottom: 0.5rem; color: var(--text-secondary, #94a3b8); font-size: 0.9rem;">Create with <code>provideFormBridge(form, config?)</code> (auto-cleanup via DestroyRef) or <code>createFormBridge(form, config?)</code> (manual destroy).</p>
       <div class="api-table-wrapper">
         <table class="api-table">
           <thead>
@@ -695,18 +701,11 @@ export class MyComponent &#123;
           </thead>
           <tbody>
             <tr><td><code>applyApiErrors(error)</code></td><td><code>ResolvedFieldError[]</code></td><td>Parse and apply API errors to form controls</td></tr>
-            <tr><td><code>handleSubmit(source)</code></td><td><code>Observable&lt;T&gt;</code></td><td>Wrap an Observable: disable form, apply errors on failure, re-enable</td></tr>
             <tr><td><code>clearApiErrors()</code></td><td><code>void</code></td><td>Clear all API errors, restore client validation</td></tr>
             <tr><td><code>getFirstError()</code></td><td><code>FirstError | null</code></td><td>Get the first error across all controls</td></tr>
             <tr><td><code>getFieldErrors(field)</code></td><td><code>ValidationErrors | null</code></td><td>Get errors for a specific field</td></tr>
-            <tr><td><code>setDefaultValues(values)</code></td><td><code>void</code></td><td>Set default values and reset form</td></tr>
-            <tr><td><code>reset()</code></td><td><code>void</code></td><td>Reset form to defaults, clear errors</td></tr>
-            <tr><td><code>enable(options?)</code></td><td><code>void</code></td><td>Enable controls (with exceptions)</td></tr>
-            <tr><td><code>disable(options?)</code></td><td><code>void</code></td><td>Disable controls (with exceptions)</td></tr>
-            <tr><td><code>toFormData()</code></td><td><code>FormData</code></td><td>Convert form values to FormData</td></tr>
             <tr><td><code>addInterceptor(fn)</code></td><td><code>() =&gt; void</code></td><td>Register an error interceptor, returns a dispose function</td></tr>
-            <tr><td><code>checkDirty()</code></td><td><code>boolean</code></td><td>Check if form differs from defaults</td></tr>
-            <tr><td><code>destroy()</code></td><td><code>void</code></td><td>Clean up internal subscriptions</td></tr>
+            <tr><td><code>destroy()</code></td><td><code>void</code></td><td>Clean up subscriptions (not needed with <code>provideFormBridge</code>)</td></tr>
           </tbody>
         </table>
       </div>
@@ -721,8 +720,6 @@ export class MyComponent &#123;
             <tr><td><code>errorsSignal</code></td><td><code>Signal&lt;ResolvedFieldError[]&gt;</code></td><td>All current API errors</td></tr>
             <tr><td><code>firstErrorSignal</code></td><td><code>Signal&lt;FirstError | null&gt;</code></td><td>First error or null</td></tr>
             <tr><td><code>hasErrorsSignal</code></td><td><code>Signal&lt;boolean&gt;</code></td><td>Whether any API errors exist</td></tr>
-            <tr><td><code>isDirtySignal</code></td><td><code>Signal&lt;boolean&gt;</code></td><td>Whether form changed from defaults</td></tr>
-            <tr><td><code>isSubmittingSignal</code></td><td><code>Signal&lt;boolean&gt;</code></td><td>Whether a submit is in progress (via handleSubmit)</td></tr>
           </tbody>
         </table>
       </div>

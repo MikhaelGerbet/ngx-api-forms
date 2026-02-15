@@ -4,11 +4,13 @@ import { JsonPipe } from '@angular/common';
 import { Observable } from 'rxjs';
 import {
   createFormBridge,
+  provideFormBridge,
   classValidatorPreset,
   laravelPreset,
   djangoPreset,
   zodPreset,
   parseApiErrors,
+  wrapSubmit,
   NgxFormErrorDirective,
   ApiFieldError,
 } from 'ngx-api-forms';
@@ -32,7 +34,7 @@ export class App {
     password: ['', [Validators.required, Validators.minLength(8)]],
   });
 
-  bridge = createFormBridge(this.form, {
+  bridge = provideFormBridge(this.form, {
     preset: classValidatorPreset(),
   });
 
@@ -42,7 +44,7 @@ export class App {
     name: [''],
   });
 
-  i18nBridge = createFormBridge(this.i18nForm, {
+  i18nBridge = provideFormBridge(this.i18nForm, {
     preset: classValidatorPreset(),
     i18n: { prefix: 'validation' },
   });
@@ -56,10 +58,11 @@ export class App {
     name: ['John'],
   });
 
-  submitBridge = createFormBridge(this.submitForm, {
+  submitBridge = provideFormBridge(this.submitForm, {
     preset: classValidatorPreset(),
   });
 
+  isSubmitting = signal(false);
   submitResult = signal<string>('');
   submitShouldFail = signal<boolean>(true);
 
@@ -71,7 +74,7 @@ export class App {
     password: [''],
   });
 
-  customJsonBridge = createFormBridge(this.customJsonForm, {
+  customJsonBridge = provideFormBridge(this.customJsonForm, {
     preset: classValidatorPreset(),
   });
 
@@ -81,7 +84,7 @@ export class App {
     name: ['John'],
   });
 
-  dirtyBridge = createFormBridge(this.dirtyForm, {
+  dirtyBridge = provideFormBridge(this.dirtyForm, {
     preset: classValidatorPreset(),
   });
 
@@ -176,7 +179,8 @@ export class App {
   }
 
   resetForm(): void {
-    this.bridge.reset();
+    this.form.reset();
+    this.bridge.clearApiErrors();
     this.lastResult.set('');
     this._refreshFormErrors();
   }
@@ -243,11 +247,20 @@ export class App {
       return () => clearTimeout(timer);
     });
 
-    this.submitBridge.handleSubmit(mockApiCall$).subscribe({
+    this.isSubmitting.set(true);
+
+    wrapSubmit(this.submitForm, mockApiCall$, {
+      onError: (err: unknown) => {
+        const body = (err as any)?.error ?? err;
+        this.submitBridge.applyApiErrors(body);
+      },
+    }).subscribe({
       next: (result: { success: boolean }) => {
+        this.isSubmitting.set(false);
         this.submitResult.set('Success: ' + JSON.stringify(result));
       },
       error: () => {
+        this.isSubmitting.set(false);
         this.submitResult.set('Error handled - form re-enabled, errors applied');
       },
     });

@@ -159,13 +159,13 @@ When inference fails, you have three options:
 
 ```typescript
 // 1. Custom constraintMap to override specific mappings
-const bridge = createFormBridge(form, {
+const bridge = provideFormBridge(form, {
   preset: laravelPreset(),
   constraintMap: { 'mon_erreur_custom': 'required' },
 });
 
 // 2. catchAll to apply unmatched errors as { generic: msg }
-const bridge = createFormBridge(form, {
+const bridge = provideFormBridge(form, {
   preset: laravelPreset(),
   catchAll: true,
 });
@@ -181,16 +181,16 @@ Each backend has its own preset. Pass an array if your app talks to multiple API
 import { laravelPreset, djangoPreset, zodPreset } from 'ngx-api-forms';
 
 // Laravel
-const bridge = createFormBridge(form, { preset: laravelPreset() });
+const bridge = provideFormBridge(form, { preset: laravelPreset() });
 
 // Django REST Framework
-const bridge = createFormBridge(form, { preset: djangoPreset() });
+const bridge = provideFormBridge(form, { preset: djangoPreset() });
 
 // Zod (e.g. with tRPC)
-const bridge = createFormBridge(form, { preset: zodPreset() });
+const bridge = provideFormBridge(form, { preset: zodPreset() });
 
 // Multiple presets, tried in order
-const bridge = createFormBridge(form, {
+const bridge = provideFormBridge(form, {
   preset: [classValidatorPreset(), laravelPreset()]
 });
 ```
@@ -233,7 +233,7 @@ interface LoginForm {
 }
 
 const form = new FormGroup<LoginForm>({ ... });
-const bridge = createFormBridge(form);
+const bridge = provideFormBridge(form);
 
 // bridge.form is typed as FormGroup<LoginForm>
 bridge.form.controls.email; // FormControl<string> -- full autocompletion
@@ -318,7 +318,7 @@ interface FormBridgeConfig {
 Set `debug: true` to log warnings during development:
 
 ```typescript
-const bridge = createFormBridge(form, {
+const bridge = provideFormBridge(form, {
   preset: laravelPreset(),
   debug: true,
 });
@@ -351,14 +351,14 @@ Generate translation keys automatically or provide a custom resolver:
 
 ```typescript
 // Translation key prefix
-const bridge = createFormBridge(form, {
+const bridge = provideFormBridge(form, {
   preset: classValidatorPreset(),
   i18n: { prefix: 'validation' }
 });
 // Produces keys like "validation.email.isEmail"
 
 // Custom resolver
-const bridge = createFormBridge(form, {
+const bridge = provideFormBridge(form, {
   i18n: {
     resolver: (field, constraint, originalMessage) => {
       return this.translate.instant(`errors.${field}.${constraint}`);
