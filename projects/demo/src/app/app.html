@@ -23,25 +23,72 @@
   </header>
 
   <main class="demo-content">
-    <!-- Why section -->
+    <!-- The Problem / Solution -->
     <section class="demo-section why-section">
-      <h2>Why ngx-api-forms?</h2>
+      <h2>The Problem</h2>
+      <p>Every Angular app with server-side validation writes ad-hoc parsing code per backend, per form. Libraries like <code>&#64;ngneat/error-tailor</code> handle <em>displaying</em> client-side errors, but nothing parses API responses. That gap is what ngx-api-forms fills.</p>
+
+      <div class="before-after">
+        <div class="code-block before-block">
+          <div class="code-header">
+            <span>Without ngx-api-forms</span>
+          </div>
+          <pre><code>// Repeated in every component, for every backend
+this.http.post('/api', data).subscribe(&#123;
+  error: (err) =&gt; &#123;
+    const messages = err.error?.message;
+    if (Array.isArray(messages)) &#123;
+      for (const msg of messages) &#123;
+        const ctrl = this.form.get(msg.property);
+        if (ctrl) &#123;
+          ctrl.setErrors(msg.constraints);
+          ctrl.markAsTouched();
+        &#125;
+      &#125;
+    &#125;
+    // Switch to Laravel? Rewrite everything.
+    // Switch to Django? Rewrite everything.
+    // 10 forms? 10 copies.
+  &#125;
+&#125;);</code></pre>
+        </div>
+        <div class="code-block after-block">
+          <div class="code-header">
+            <span>With ngx-api-forms</span>
+          </div>
+          <pre><code>// Works with any supported backend
+this.http.post('/api', data).subscribe(&#123;
+  error: (err) =&gt; bridge.applyApiErrors(err.error)
+&#125;);
+
+// Or with full submit lifecycle:
+bridge.handleSubmit(
+  this.http.post('/api', data)
+).subscribe();
+
+// Switch backend? Change one preset.
+// Typed errors, constraint semantics preserved.
+// Works in interceptors too:
+// parseApiErrors(err.error, laravelPreset());</code></pre>
+        </div>
+      </div>
+
       <div class="why-grid">
         <div class="why-card">
-          <h3>API to Forms Bridge</h3>
-          <p>Automatically maps backend validation errors to Angular Reactive Forms controls. No more manual string matching.</p>
+          <h3>4 Backend Presets</h3>
+          <p>NestJS, Laravel, Django REST, Zod. Same API, different backends. One line to switch.</p>
         </div>
         <div class="why-card">
-          <h3>Multi-Backend Presets</h3>
-          <p>Built-in support for NestJS/class-validator, Laravel, Django REST, and Zod. Extensible for any backend.</p>
+          <h3>Standalone Parsing</h3>
+          <p><code>parseApiErrors()</code> works without a form. Use it in HttpInterceptors, NgRx effects, or services.</p>
         </div>
         <div class="why-card">
-          <h3>i18n Ready</h3>
-          <p>Use translation keys or custom resolvers for error messages. Works with any i18n library.</p>
+          <h3>Native Signals</h3>
+          <p>Reactive error state via <code>errorsSignal</code>, <code>hasErrorsSignal</code>, <code>isDirtySignal</code>, <code>isSubmittingSignal</code>.</p>
         </div>
         <div class="why-card">
-          <h3>Signals Support</h3>
-          <p>Built with Angular Signals for reactive error state. <code>errorsSignal</code>, <code>firstErrorSignal</code>, <code>hasErrorsSignal</code>.</p>
+          <h3>Zero Dependencies</h3>
+          <p>Only Angular as peer dependency. Tree-shakeable, SSR-compatible, i18n-ready.</p>
         </div>
       </div>
     </section>
@@ -429,6 +476,74 @@ const dispose = bridge.addInterceptor((errors) =&gt;
       </div>
     </section>
 
+    <!-- Standalone Parsing Demo -->
+    <section class="demo-section standalone-demo">
+      <h2>Standalone Parsing</h2>
+      <p><code>parseApiErrors()</code> parses API error bodies without a form or a FormBridge. Use it in HttpInterceptors, NgRx effects, services, or anywhere you need structured errors.</p>
+
+      <div class="demo-layout">
+        <div class="demo-form-side">
+          <h3>No form needed</h3>
+          <div class="info-box">
+            <p>This demo calls <code>parseApiErrors(error, preset)</code> directly. No <code>FormGroup</code>, no <code>FormBridge</code>. The function returns a normalized <code>ApiFieldError[]</code> regardless of the backend format.</p>
+          </div>
+
+          <div class="demo-controls">
+            <div class="preset-selector">
+              <label>Backend format:</label>
+              <select [value]="standalonePreset()" (change)="standalonePreset.set($any($event.target).value)">
+                <option value="class-validator">NestJS / class-validator</option>
+                <option value="laravel">Laravel</option>
+                <option value="django">Django REST</option>
+                <option value="zod">Zod</option>
+              </select>
+            </div>
+            <div class="demo-buttons">
+              <button class="btn btn-primary" (click)="simulateStandaloneParsing()">Parse Errors</button>
+              <button class="btn btn-secondary" (click)="standaloneResult.set('')">Clear</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="demo-result-side">
+          <h3>Parsed Output</h3>
+          @if (standaloneResult()) {
+            <div class="result-panel resolved">
+              <pre><code>{{ standaloneResult() }}</code></pre>
+            </div>
+          } @else {
+            <div class="info-box">
+              <p>Select a backend format and click "Parse Errors" to see the normalized output.</p>
+            </div>
+          }
+        </div>
+      </div>
+
+      <div class="code-tabs">
+        <h3>Implementation</h3>
+        <div class="code-block">
+          <div class="code-header">
+            <span>interceptor.ts</span>
+            <button class="copy-btn" (click)="copyToClipboard('import { HttpInterceptorFn } from \'@angular/common/http\';\nimport { parseApiErrors, classValidatorPreset } from \'ngx-api-forms\';\n\nexport const apiErrorInterceptor: HttpInterceptorFn = (req, next) => {\n  return next(req).pipe(\n    catchError((err) => {\n      if (err.status === 422) {\n        const errors = parseApiErrors(err.error, classValidatorPreset());\n        errorStore.setFieldErrors(errors);\n      }\n      return throwError(() => err);\n    }),\n  );\n};')">Copy</button>
+          </div>
+          <pre><code>import &#123; HttpInterceptorFn &#125; from '&#64;angular/common/http';
+import &#123; parseApiErrors, classValidatorPreset &#125; from 'ngx-api-forms';
+
+export const apiErrorInterceptor: HttpInterceptorFn = (req, next) =&gt; &#123;
+  return next(req).pipe(
+    catchError((err) =&gt; &#123;
+      if (err.status === 422) &#123;
+        const errors = parseApiErrors(err.error, classValidatorPreset());
+        errorStore.setFieldErrors(errors);
+      &#125;
+      return throwError(() =&gt; err);
+    &#125;),
+  );
+&#125;;</code></pre>
+        </div>
+      </div>
+    </section>
+
     <!-- Custom JSON Demo -->
     <section class="demo-section custom-demo">
       <h2>Custom Error Payload</h2>
@@ -623,6 +738,26 @@ export class MyComponent &#123;
             <tr><td><code>laravelPreset()</code></td><td>Laravel</td><td><code>&#123; errors: &#123; field: [msgs] &#125; &#125;</code></td></tr>
             <tr><td><code>djangoPreset()</code></td><td>Django REST</td><td><code>&#123; field: [msgs] &#125;</code></td></tr>
             <tr><td><code>zodPreset()</code></td><td>Zod</td><td><code>&#123; fieldErrors: &#123;...&#125; &#125;</code> or <code>&#123; issues: [...] &#125;</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Standalone Functions</h3>
+      <div class="api-table-wrapper">
+        <table class="api-table">
+          <thead>
+            <tr><th>Function</th><th>Description</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>parseApiErrors(error, preset?)</code></td><td>Parse API errors without a form. Works in interceptors, stores, effects.</td></tr>
+            <tr><td><code>wrapSubmit(form, source, opts?)</code></td><td>Submit lifecycle (disable/enable) without FormBridge.</td></tr>
+            <tr><td><code>toFormData(data)</code></td><td>Convert a plain object to FormData (Files, Blobs, Arrays, nested objects).</td></tr>
+            <tr><td><code>enableForm(form, opts?)</code></td><td>Enable all controls, with optional <code>except</code> list.</td></tr>
+            <tr><td><code>disableForm(form, opts?)</code></td><td>Disable all controls, with optional <code>except</code> list.</td></tr>
+            <tr><td><code>clearFormErrors(form)</code></td><td>Clear all errors from all controls.</td></tr>
+            <tr><td><code>getDirtyValues(form)</code></td><td>Return only dirty fields and their values.</td></tr>
+            <tr><td><code>hasError(form, errorKey)</code></td><td>Check if any control has a specific error.</td></tr>
+            <tr><td><code>getErrorMessage(form, field, key?)</code></td><td>Get the error message string for a field.</td></tr>
           </tbody>
         </table>
       </div>

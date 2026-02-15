@@ -76,7 +76,32 @@
   }
 }
 
-// Why section
+// Why section - Before/After
+.before-after {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.before-block {
+  .code-header {
+    background: rgba(239, 68, 68, 0.08);
+    span { color: #ef4444; }
+  }
+}
+
+.after-block {
+  .code-header {
+    background: rgba(34, 197, 94, 0.08);
+    span { color: #16a34a; }
+  }
+}
+
 .why-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));

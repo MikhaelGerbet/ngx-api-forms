@@ -8,6 +8,7 @@ import {
   laravelPreset,
   djangoPreset,
   zodPreset,
+  parseApiErrors,
   NgxFormErrorDirective,
   ApiFieldError,
 } from 'ngx-api-forms';
@@ -86,6 +87,10 @@ export class App {
 
   interceptorActive = signal(false);
   private interceptorDispose: (() => void) | null = null;
+
+  // ---- Standalone Parsing Demo ----
+  standalonePreset = signal<string>('class-validator');
+  standaloneResult = signal<string>('');
 
   customJson = signal<string>(JSON.stringify({
     statusCode: 400,
@@ -271,6 +276,23 @@ export class App {
   clearCustom(): void {
     this.customJsonBridge.clearApiErrors();
     this.customResult.set('');
+  }
+
+  // ---- Standalone Parsing Demo ----
+
+  simulateStandaloneParsing(): void {
+    const key = this.standalonePreset();
+    const error = this.mockErrors[key.startsWith('class-validator') ? 'class-validator' : key];
+
+    let preset;
+    if (key === 'class-validator') preset = classValidatorPreset();
+    else if (key === 'laravel') preset = laravelPreset();
+    else if (key === 'django') preset = djangoPreset();
+    else preset = zodPreset();
+
+    // parseApiErrors works without any form or FormBridge
+    const errors = parseApiErrors(error, preset);
+    this.standaloneResult.set(JSON.stringify(errors, null, 2));
   }
 
   // ---- Dirty & Interceptor Demo ----
