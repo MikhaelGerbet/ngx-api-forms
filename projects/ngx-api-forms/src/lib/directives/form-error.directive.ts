@@ -21,9 +21,11 @@ import {
   Directive,
   ElementRef,
   Input,
+  OnChanges,
   OnDestroy,
   OnInit,
   Renderer2,
+  SimpleChanges,
   inject,
 } from '@angular/core';
 import { FormGroup, AbstractControl } from '@angular/forms';
@@ -33,7 +35,7 @@ import { Subscription, merge } from 'rxjs';
   selector: '[ngxFormError]',
   standalone: true,
 })
-export class NgxFormErrorDirective implements OnInit, OnDestroy {
+export class NgxFormErrorDirective implements OnInit, OnChanges, OnDestroy {
   private readonly el = inject(ElementRef);
   private readonly renderer = inject(Renderer2);
 
@@ -65,23 +67,34 @@ export class NgxFormErrorDirective implements OnInit, OnDestroy {
   private subscription: Subscription | null = null;
 
   ngOnInit(): void {
+    this._subscribe();
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if ((changes['form'] || changes['controlName']) && !changes['form']?.firstChange) {
+      this._subscribe();
+    }
+  }
+
+  ngOnDestroy(): void {
+    this.subscription?.unsubscribe();
+  }
+
+  private _subscribe(): void {
+    this.subscription?.unsubscribe();
+    this.subscription = null;
+
     const control = this.form?.get(this.controlName);
     if (!control) {
       this._hide();
       return;
     }
 
-    // Listen to status and value changes
     this.subscription = merge(control.statusChanges, control.valueChanges).subscribe(() => {
       this._updateDisplay(control);
     });
 
-    // Initial check
     this._updateDisplay(control);
-  }
-
-  ngOnDestroy(): void {
-    this.subscription?.unsubscribe();
   }
 
   private _updateDisplay(control: AbstractControl): void {

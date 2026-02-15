@@ -171,8 +171,9 @@ const bridge = createFormBridge(form, {
 | `disable(options?)` | `void` | Disable controls (supports `except` list) |
 | `toFormData(values?)` | `FormData` | Convert form values to FormData |
 | `handleSubmit(source)` | `Observable<T>` | Wrap an Observable: disable form, apply errors on failure, re-enable |
-| `addInterceptor(fn)` | `void` | Register an error interceptor |
+| `addInterceptor(fn)` | `() => void` | Register an error interceptor. Returns a dispose function |
 | `checkDirty()` | `boolean` | Check if form differs from defaults |
+| `destroy()` | `void` | Clean up internal subscriptions |
 
 ### Signals
 
@@ -264,9 +265,10 @@ bridge.handleSubmit(source, {
 Interceptors let you filter or transform errors before they reach the form.
 
 ```typescript
-bridge.addInterceptor((errors, form) => {
+const dispose = bridge.addInterceptor((errors, form) => {
   return errors.filter(e => e.field !== 'internalField');
 });
+// Later: dispose() to remove the interceptor
 ```
 
 ### Standalone Utility Functions
@@ -280,7 +282,6 @@ import {
   disableForm,
   clearFormErrors,
   getDirtyValues,
-  markAllAsTouched,
   hasError,
   getErrorMessage,
 } from 'ngx-api-forms';

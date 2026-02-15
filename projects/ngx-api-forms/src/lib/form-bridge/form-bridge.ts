@@ -10,8 +10,8 @@
  * - FormData conversion utilities
  */
 import { signal, computed, Signal, WritableSignal } from '@angular/core';
-import { FormGroup, ValidationErrors } from '@angular/forms';
-import { Observable, tap, catchError } from 'rxjs';
+import { FormGroup, FormArray, ValidationErrors, AbstractControl } from '@angular/forms';
+import { Observable, Subscription, tap, catchError } from 'rxjs';
 
 import {
   ApiFieldError,
@@ -25,6 +25,7 @@ import {
   I18nConfig,
   ResolvedFieldError,
 } from '../models/api-forms.models';
+import { toFormData as toFormDataUtil } from '../utils/form-utils';
 import { CLASS_VALIDATOR_CONSTRAINT_MAP, classValidatorPreset } from '../presets/class-validator.preset';
 import { LARAVEL_CONSTRAINT_MAP } from '../presets/laravel.preset';
 import { DJANGO_CONSTRAINT_MAP } from '../presets/django.preset';
@@ -64,7 +65,8 @@ export class FormBridge {
   private readonly _catchAll: boolean;
   private readonly _mergeErrors: boolean;
   private readonly _defaultValues: Record<string, unknown> = {};
-  private readonly _interceptors: ErrorInterceptor[] = [];
+  private _interceptors: ErrorInterceptor[] = [];
+  private _valueChangesSub: Subscription | null = null;
 
   /** Signal containing the last set of resolved API errors */
   private readonly _apiErrors: WritableSignal<ResolvedFieldError[]> = signal([]);
@@ -117,6 +119,19 @@ export class FormBridge {
 
     // Store initial form values as defaults
     this._captureDefaults();
+
+    // Subscribe to valueChanges for reactive isDirtySignal
+    this._valueChangesSub = this._form.valueChanges.subscribe(() => {
+      this._computeDirty();
+    });
+  }
+
+  /**
+   * Clean up subscriptions. Call this when the FormBridge is no longer needed.
+   */
+  destroy(): void {
+    this._valueChangesSub?.unsubscribe();
+    this._valueChangesSub = null;
   }
 
   // ---- Public API - Error Management ----
@@ -207,9 +222,13 @@ export class FormBridge {
   /**
    * Register an error interceptor that can modify or filter errors
    * before they are applied to the form.
+   * Returns a dispose function to remove the interceptor.
    */
-  addInterceptor(interceptor: ErrorInterceptor): void {
+  addInterceptor(interceptor: ErrorInterceptor): () => void {
     this._interceptors.push(interceptor);
+    return () => {
+      this._interceptors = this._interceptors.filter(i => i !== interceptor);
+    };
   }
 
   /**
@@ -307,85 +326,18 @@ export class FormBridge {
    * Check if the form values have changed compared to the defaults.
    */
   checkDirty(): boolean {
-    const currentValues = this._form.getRawValue();
-    let isDirty = false;
-
-    for (const key of Object.keys(this._defaultValues)) {
-      if (currentValues[key] !== this._defaultValues[key]) {
-        isDirty = true;
-        break;
-      }
-    }
-
-    this._isDirty.set(isDirty);
-    return isDirty;
-  }
-
-  /**
-   * Get the current default values.
-   */
-  getDefaultValues(): Record<string, unknown> {
-    return { ...this._defaultValues };
+    this._computeDirty();
+    return this._isDirty();
   }
 
   // ---- Public API - Utilities ----
 
   /**
    * Convert form values to FormData (for file uploads).
-   *
-   * Handles: Files, Arrays, null/undefined, nested objects.
+   * Delegates to the standalone `toFormData()` utility.
    */
   toFormData(values?: Record<string, unknown>): FormData {
-    const data = values ?? this._form.getRawValue();
-    const formData = new FormData();
-
-    for (const [key, value] of Object.entries(data)) {
-      if (value === null || value === undefined) continue;
-
-      if (value instanceof File) {
-        formData.append(key, value);
-        continue;
-      }
-
-      if (value instanceof Blob) {
-        formData.append(key, value);
-        continue;
-      }
-
-      if (Array.isArray(value)) {
-        for (const item of value) {
-          if (item instanceof File || item instanceof Blob) {
-            formData.append(key, item);
-          } else if (typeof item === 'object' && item !== null) {
-            formData.append(key, JSON.stringify(item));
-          } else {
-            formData.append(key, String(item));
-          }
-        }
-        continue;
-      }
-
-      if (value instanceof Date) {
-        formData.append(key, value.toISOString());
-        continue;
-      }
-
-      if (typeof value === 'object') {
-        formData.append(key, JSON.stringify(value));
-        continue;
-      }
-
-      formData.append(key, String(value));
-    }
-
-    return formData;
-  }
-
-  /**
-   * Get the raw form value (including disabled controls).
-   */
-  getRawValue(): Record<string, unknown> {
-    return this._form.getRawValue();
+    return toFormDataUtil(values ?? this._form.getRawValue());
   }
 
   /**
@@ -417,23 +369,30 @@ export class FormBridge {
     }
   }
 
+  private _computeDirty(): void {
+    const currentValues = this._form.getRawValue();
+    let isDirty = false;
+    for (const key of Object.keys(this._defaultValues)) {
+      if (currentValues[key] !== this._defaultValues[key]) {
+        isDirty = true;
+        break;
+      }
+    }
+    this._isDirty.set(isDirty);
+  }
+
   private _applyErrors(fieldErrors: ApiFieldError[]): ResolvedFieldError[] {
     const resolved: ResolvedFieldError[] = [];
 
-    for (const fieldError of fieldErrors) {
-      const control = this._form.controls[fieldError.field];
-      if (!control) {
-        // Try nested path (e.g. 'address.city')
-        const nestedControl = this._resolveNestedControl(fieldError.field);
-        if (!nestedControl) continue;
+    // Accumulate errors per control to avoid overwrite within a single applyApiErrors call
+    const pendingErrors = new Map<AbstractControl, ValidationErrors>();
 
-        const errorKey = this._resolveErrorKey(fieldError.constraint);
-        const message = this._resolveMessage(fieldError);
-        const currentErrors = this._mergeErrors ? (nestedControl.errors ?? {}) : {};
-        nestedControl.markAsTouched();
-        nestedControl.setErrors({ ...currentErrors, [errorKey]: message });
-        resolved.push({ field: fieldError.field, errorKey, message });
-        continue;
+    for (const fieldError of fieldErrors) {
+      let control: AbstractControl | null = this._form.controls[fieldError.field] ?? null;
+      if (!control) {
+        // Try nested path (e.g. 'address.city' or 'items.0.name')
+        control = this._resolveNestedControl(fieldError.field);
+        if (!control) continue;
       }
 
       const errorKey = this._resolveErrorKey(fieldError.constraint);
@@ -442,25 +401,36 @@ export class FormBridge {
       if (!errorKey && !this._catchAll) continue;
 
       const finalErrorKey = errorKey || 'generic';
-      const currentErrors = this._mergeErrors ? (control.errors ?? {}) : {};
-      control.markAsTouched();
-      control.setErrors({ ...currentErrors, [finalErrorKey]: message });
+
+      // Accumulate: merge with already-pending errors for this control
+      const existing = pendingErrors.get(control) ?? (this._mergeErrors ? (control.errors ?? {}) : {});
+      pendingErrors.set(control, { ...existing, [finalErrorKey]: message });
 
       resolved.push({ field: fieldError.field, errorKey: finalErrorKey, message });
+    }
+
+    // Apply accumulated errors once per control
+    for (const [control, errors] of pendingErrors) {
+      control.markAsTouched();
+      control.setErrors(errors);
     }
 
     return resolved;
   }
 
-  private _resolveNestedControl(path: string): import('@angular/forms').AbstractControl | null {
+  private _resolveNestedControl(path: string): AbstractControl | null {
     const parts = path.split('.');
-    let current: import('@angular/forms').AbstractControl = this._form;
+    let current: AbstractControl = this._form;
 
     for (const part of parts) {
       if (current instanceof FormGroup) {
         const child = current.controls[part];
         if (!child) return null;
         current = child;
+      } else if (current instanceof FormArray) {
+        const index = parseInt(part, 10);
+        if (isNaN(index) || index < 0 || index >= current.length) return null;
+        current = current.at(index);
       } else {
         return null;
       }

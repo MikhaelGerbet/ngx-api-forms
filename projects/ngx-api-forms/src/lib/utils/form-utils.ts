@@ -94,13 +94,6 @@ export function getDirtyValues(form: FormGroup): Record<string, unknown> {
 }
 
 /**
- * Mark all controls as touched (for showing validation on submit).
- */
-export function markAllAsTouched(form: FormGroup): void {
-  form.markAllAsTouched();
-}
-
-/**
  * Check if any control in the form has a specific error key.
  */
 export function hasError(form: FormGroup, errorKey: string): boolean {

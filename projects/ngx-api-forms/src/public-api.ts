@@ -8,9 +8,6 @@ export * from './lib/models/api-forms.models';
 // Core
 export { FormBridge, createFormBridge } from './lib/form-bridge/form-bridge';
 
-// Service
-export { NgxApiFormsService } from './lib/services/ngx-api-forms.service';
-
 // Presets
 export {
   classValidatorPreset,
@@ -39,7 +36,6 @@ export {
   disableForm,
   clearFormErrors,
   getDirtyValues,
-  markAllAsTouched,
   hasError,
   getErrorMessage,
 } from './lib/utils/form-utils';

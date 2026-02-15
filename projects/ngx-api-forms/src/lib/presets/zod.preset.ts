@@ -128,8 +128,16 @@ export function zodPreset(): ErrorPreset {
       // Format 4: Wrapped { errors: { fieldErrors: {...} } } or { error: {...} }
       if (err['errors'] && typeof err['errors'] === 'object') {
         const nested = err['errors'] as Partial<ZodFlatError>;
-        if (nested.fieldErrors) {
-          return zodPreset().parse(nested);
+        if (nested.fieldErrors && typeof nested.fieldErrors === 'object') {
+          const result: ApiFieldError[] = [];
+          for (const [field, messages] of Object.entries(nested.fieldErrors)) {
+            if (!Array.isArray(messages)) continue;
+            for (const message of messages) {
+              if (typeof message !== 'string') continue;
+              result.push({ field, constraint: inferConstraintFromMessage(message), message });
+            }
+          }
+          return result;
         }
       }
 

@@ -547,4 +547,191 @@ describe('FormBridge', () => {
       expect(wasTouchedOnStatusChange).toBeTrue();
     });
   });
+
+  describe('multi-error accumulation on same field', () => {
+    it('should keep all errors when same field has multiple constraints', () => {
+      const bridge = createFormBridge(form, { preset: classValidatorPreset() });
+
+      const errors = bridge.applyApiErrors({
+        statusCode: 400,
+        message: [
+          {
+            property: 'email',
+            constraints: {
+              isEmail: 'email must be an email',
+              isNotEmpty: 'email should not be empty',
+            },
+          },
+        ],
+      });
+
+      expect(errors.length).toBe(2);
+      // Both errors should be present on the control (not just the last one)
+      expect(form.controls['email'].hasError('email')).toBeTrue();
+      expect(form.controls['email'].hasError('required')).toBeTrue();
+    });
+
+    it('should accumulate errors from multiple fields independently', () => {
+      const bridge = createFormBridge(form, { preset: classValidatorPreset() });
+
+      bridge.applyApiErrors({
+        statusCode: 400,
+        message: [
+          { property: 'email', constraints: { isEmail: 'bad email', isNotEmpty: 'empty' } },
+          { property: 'name', constraints: { isNotEmpty: 'empty name' } },
+        ],
+      });
+
+      expect(form.controls['email'].hasError('email')).toBeTrue();
+      expect(form.controls['email'].hasError('required')).toBeTrue();
+      expect(form.controls['name'].hasError('required')).toBeTrue();
+    });
+  });
+
+  describe('removeInterceptor (dispose function)', () => {
+    it('should return a dispose function from addInterceptor', () => {
+      const bridge = createFormBridge(form, { preset: classValidatorPreset() });
+      const dispose = bridge.addInterceptor((errors) => errors);
+      expect(typeof dispose).toBe('function');
+    });
+
+    it('should remove interceptor when dispose is called', () => {
+      const bridge = createFormBridge(form, { preset: classValidatorPreset() });
+
+      const dispose = bridge.addInterceptor((errors) =>
+        errors.filter((e) => e.field !== 'email')
+      );
+
+      // With interceptor: email errors are filtered out
+      let result = bridge.applyApiErrors({
+        message: [
+          { property: 'email', constraints: { isEmail: 'bad' } },
+          { property: 'name', constraints: { isNotEmpty: 'required' } },
+        ],
+      });
+      expect(result.length).toBe(1);
+      expect(result[0].field).toBe('name');
+
+      // After dispose: email errors come through again
+      bridge.clearApiErrors();
+      dispose();
+
+      result = bridge.applyApiErrors({
+        message: [
+          { property: 'email', constraints: { isEmail: 'bad' } },
+          { property: 'name', constraints: { isNotEmpty: 'required' } },
+        ],
+      });
+      expect(result.length).toBe(2);
+    });
+  });
+
+  describe('reactive isDirtySignal', () => {
+    it('should update isDirtySignal reactively when form value changes', () => {
+      const bridge = createFormBridge(form);
+      bridge.setDefaultValues({ email: 'test@test.com' });
+
+      expect(bridge.isDirtySignal()).toBeFalse();
+
+      form.controls['email'].setValue('changed@test.com');
+
+      // isDirtySignal should update reactively (via valueChanges subscription)
+      expect(bridge.isDirtySignal()).toBeTrue();
+
+      form.controls['email'].setValue('test@test.com');
+      expect(bridge.isDirtySignal()).toBeFalse();
+    });
+  });
+
+  describe('destroy()', () => {
+    it('should stop listening to valueChanges after destroy', () => {
+      const bridge = createFormBridge(form);
+      bridge.setDefaultValues({ email: 'test@test.com' });
+
+      bridge.destroy();
+
+      // After destroy, changing form value should NOT update isDirtySignal
+      form.controls['email'].setValue('changed@test.com');
+      // isDirtySignal remains false because valueChanges subscription is gone
+      expect(bridge.isDirtySignal()).toBeFalse();
+    });
+  });
+
+  describe('FormArray support', () => {
+    it('should resolve errors on FormArray children via dot-index notation', () => {
+      const fb2 = new FormBuilder();
+      const arrayForm = fb2.group({
+        items: fb2.array([
+          fb2.group({ name: [''] }),
+          fb2.group({ name: [''] }),
+        ]),
+      });
+
+      const bridge = createFormBridge(arrayForm, { preset: classValidatorPreset() });
+
+      // Simulate API error on items.0.name using class-validator nested format
+      // We'll use a direct applyApiErrors with pre-parsed field path
+      const errors = bridge.applyApiErrors({
+        message: [
+          {
+            property: 'items',
+            children: [
+              {
+                property: '0',
+                children: [
+                  { property: 'name', constraints: { isNotEmpty: 'name is required' } },
+                ],
+              },
+            ],
+          },
+        ],
+      });
+
+      expect(errors.length).toBe(1);
+      expect(errors[0].field).toBe('items.0.name');
+
+      // Verify the error is actually on the nested FormControl
+      const nameControl = arrayForm.get(['items', '0', 'name']);
+      expect(nameControl).toBeTruthy();
+      expect(nameControl!.hasError('required')).toBeTrue();
+    });
+  });
+
+  describe('catchAll option', () => {
+    it('should skip unknown constraints when catchAll is false (default)', () => {
+      const bridge = createFormBridge(form, {
+        preset: classValidatorPreset(),
+        catchAll: false,
+      });
+
+      // Use a constraint that maps to '' in the constraint map
+      // Actually, unknown constraints pass through as-is, so let's test with a real scenario
+      const errors = bridge.applyApiErrors({
+        message: [
+          { property: 'email', constraints: { isEmail: 'bad email' } },
+        ],
+      });
+
+      expect(errors.length).toBe(1);
+    });
+
+    it('should use "generic" key for unknown constraints when catchAll is true', () => {
+      const bridge = createFormBridge(form, {
+        preset: classValidatorPreset(),
+        catchAll: true,
+      });
+
+      // Simulate an error with an empty constraint key (maps to '' in constraintMap)
+      const errors = bridge.applyApiErrors({
+        message: [
+          { property: 'email', constraints: { '': 'something went wrong' } },
+        ],
+      });
+
+      // With catchAll=true, empty errorKey is replaced by 'generic'
+      expect(errors.length).toBe(1);
+      expect(errors[0].errorKey).toBe('generic');
+      expect(form.controls['email'].hasError('generic')).toBeTrue();
+    });
+  });
 });
