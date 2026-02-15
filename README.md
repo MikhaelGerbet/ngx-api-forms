@@ -8,6 +8,8 @@ Angular library that maps API validation errors to Reactive Forms controls. Work
 [![CI/CD](https://img.shields.io/github/actions/workflow/status/MikhaelGerbet/ngx-api-forms/ci.yml?style=flat-square&label=CI%2FCD)](https://github.com/MikhaelGerbet/ngx-api-forms/actions)
 [![Zero dependencies](https://img.shields.io/badge/dependencies-0-brightgreen?style=flat-square)](https://www.npmjs.com/package/ngx-api-forms?activeTab=dependencies)
 
+**[Live Demo](https://mikhaelgerbet.github.io/ngx-api-forms/)**
+
 ## Why
 
 Most Angular apps that talk to a backend with validation end up writing repetitive, fragile code to map server errors onto form controls:
