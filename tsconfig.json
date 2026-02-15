@@ -10,6 +10,15 @@
     "paths": {
       "ngx-api-forms": [
         "./projects/ngx-api-forms/src/public-api"
+      ],
+      "ngx-api-forms/django": [
+        "./projects/ngx-api-forms/django/src/public-api"
+      ],
+      "ngx-api-forms/laravel": [
+        "./projects/ngx-api-forms/laravel/src/public-api"
+      ],
+      "ngx-api-forms/zod": [
+        "./projects/ngx-api-forms/zod/src/public-api"
       ]
     },
     "noFallthroughCasesInSwitch": true,

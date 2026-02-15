@@ -17,7 +17,7 @@
  * }
  * ```
  */
-import { ApiFieldError, DjangoValidationErrors, ErrorPreset, GLOBAL_ERROR_FIELD } from '../models/api-forms.models';
+import { ApiFieldError, ConstraintMap, DjangoValidationErrors, ErrorPreset, GLOBAL_ERROR_FIELD } from 'ngx-api-forms';
 
 /**
  * Infers a constraint key from a Django REST Framework validation message.
@@ -25,7 +25,7 @@ import { ApiFieldError, DjangoValidationErrors, ErrorPreset, GLOBAL_ERROR_FIELD 
  * @remarks
  * This function relies on English-language pattern matching (e.g. "this field is required",
  * "valid email"). If your Django backend returns translated messages (USE_I18N=True with
- * non-English locale), the inference will fall back to 'invalid'. In that case, use a
+ * non-English locale), the inference will fall back to 'serverError'. In that case, use a
  * `constraintMap` in your FormBridgeConfig or write a custom preset.
  */
 function inferConstraint(message: string): string {
@@ -56,6 +56,27 @@ function snakeToCamel(str: string): string {
 }
 
 /**
+ * Default constraint map for Django REST Framework.
+ */
+export const DJANGO_CONSTRAINT_MAP: ConstraintMap = {
+  required: 'required',
+  email: 'email',
+  minlength: 'minlength',
+  maxlength: 'maxlength',
+  min: 'min',
+  max: 'max',
+  integer: 'integer',
+  number: 'number',
+  date: 'date',
+  url: 'url',
+  unique: 'unique',
+  phone: 'phone',
+  pattern: 'pattern',
+  invalid: 'invalid',
+  serverError: 'serverError',
+};
+
+/**
  * Creates a Django REST Framework validation error preset.
  *
  * @param options.camelCase - If true, converts snake_case field names to camelCase (default: true)
@@ -65,7 +86,7 @@ function snakeToCamel(str: string): string {
  *
  * @example
  * ```typescript
- * import { djangoPreset } from 'ngx-api-forms';
+ * import { djangoPreset } from 'ngx-api-forms/django';
  *
  * // Default: infer constraint from English messages
  * const bridge = createFormBridge(form, { preset: djangoPreset() });
@@ -80,6 +101,7 @@ export function djangoPreset(options?: { camelCase?: boolean; noInference?: bool
 
   return {
     name: 'django',
+    constraintMap: DJANGO_CONSTRAINT_MAP,
     parse(error: unknown): ApiFieldError[] {
       if (!error || typeof error !== 'object' || Array.isArray(error)) return [];
 
@@ -110,24 +132,3 @@ export function djangoPreset(options?: { camelCase?: boolean; noInference?: bool
     },
   };
 }
-
-/**
- * Default constraint map for Django REST Framework.
- */
-export const DJANGO_CONSTRAINT_MAP: Record<string, string> = {
-  required: 'required',
-  email: 'email',
-  minlength: 'minlength',
-  maxlength: 'maxlength',
-  min: 'min',
-  max: 'max',
-  integer: 'integer',
-  number: 'number',
-  date: 'date',
-  url: 'url',
-  unique: 'unique',
-  phone: 'phone',
-  pattern: 'pattern',
-  invalid: 'invalid',
-  serverError: 'serverError',
-};

@@ -67,7 +67,8 @@ If you're unsure whether your backend is compatible, call `parseApiErrors(err.er
 ### Minimal: parse errors without a form
 
 ```typescript
-import { parseApiErrors, laravelPreset } from 'ngx-api-forms';
+import { parseApiErrors } from 'ngx-api-forms';
+import { laravelPreset } from 'ngx-api-forms/laravel';
 
 const errors = parseApiErrors(apiResponse, laravelPreset());
 // [{ field: 'email', constraint: 'required', message: 'The email field is required.' }]
@@ -125,7 +126,19 @@ export class MyComponent {
 npm install ngx-api-forms
 ```
 
-Or with `ng add` to scaffold an example component with your backend preset:
+Presets are imported from secondary entry points for tree-shaking:
+
+```typescript
+// Core (FormBridge, classValidatorPreset, utilities, interceptor)
+import { provideFormBridge, classValidatorPreset } from 'ngx-api-forms';
+
+// Other presets - import only what you use
+import { djangoPreset } from 'ngx-api-forms/django';
+import { laravelPreset } from 'ngx-api-forms/laravel';
+import { zodPreset } from 'ngx-api-forms/zod';
+```
+
+If your project uses `ng add`:
 
 ```bash
 ng add ngx-api-forms --preset=laravel
@@ -172,7 +185,7 @@ Available presets: `laravel`, `django`, `class-validator`, `zod`.
 }
 ```
 
-## Constraint Inference
+## Constraint Inference and i18n Limitation
 
 The Laravel, Django, and Zod presets infer constraint types (e.g. "required", "email") by pattern-matching on the English text of error messages. This works reliably with default backend messages.
 
@@ -180,24 +193,39 @@ When a message does not match any pattern, the constraint falls back to `'server
 
 Known limitations:
 
-- **Translated messages**: Non-English messages fall back to `'serverError'` for most constraints.
+- **Translated messages**: If your backend returns messages in French, German, or any non-English locale, most messages will fall back to `'serverError'`. The inference functions only match English patterns like "this field is required" or "must be a valid email".
 - **Custom messages**: Overridden validation messages may not match the built-in patterns.
-- **NestJS/class-validator does not have this limitation** because it transmits the constraint key directly (e.g. `isEmail`, `isNotEmpty`).
+- **NestJS/class-validator does not have this limitation** because it transmits the constraint key directly (e.g. `isEmail`, `isNotEmpty`), regardless of message language.
 
 When inference is not enough:
 
 ```typescript
-// 1. Custom constraintMap to override specific mappings
+import { laravelPreset } from 'ngx-api-forms/laravel';
+
+// 1. Disable inference entirely -- all errors get constraint 'serverError'
+//    Useful when you handle all mapping via constraintMap
+const bridge = provideFormBridge(form, {
+  preset: laravelPreset({ noInference: true }),
+  constraintMap: {
+    serverError: 'serverError',
+    // Map your own constraint names to Angular error keys
+  },
+});
+
+// 2. Custom constraintMap to override specific mappings
 const bridge = provideFormBridge(form, {
   preset: laravelPreset(),
   constraintMap: { 'mon_erreur_custom': 'required' },
 });
 
-// 2. catchAll to apply unmatched errors as { generic: msg }
+// 3. catchAll to apply unmatched errors as { generic: msg }
 const bridge = provideFormBridge(form, {
   preset: laravelPreset(),
   catchAll: true,
 });
+
+// 4. Write a custom preset for full control (see below)
+```
 
 // 3. Disable inference entirely -- all errors get constraint 'serverError'
 const bridge = provideFormBridge(form, {
@@ -231,10 +259,13 @@ Unmatched fields (errors referencing a field that does not exist in the form) ar
 
 ## Switching Backends
 
-Each backend has its own preset. Pass an array if your app talks to multiple APIs -- they are tried in order until one matches.
+Each backend has its own preset, imported from a secondary entry point. Pass an array if your app talks to multiple APIs -- they are tried in order until one matches.
 
 ```typescript
-import { laravelPreset, djangoPreset, zodPreset } from 'ngx-api-forms';
+import { laravelPreset } from 'ngx-api-forms/laravel';
+import { djangoPreset } from 'ngx-api-forms/django';
+import { zodPreset } from 'ngx-api-forms/zod';
+import { classValidatorPreset } from 'ngx-api-forms';
 
 // Laravel
 const bridge = provideFormBridge(form, { preset: laravelPreset() });
@@ -325,11 +356,13 @@ export const myInterceptor: HttpInterceptorFn = (req, next) => {
 
 ## Resource Integration (Angular 19+)
 
-When using `resource()` or `rxResource()`, call `connectResource` to wire the error signal to a FormBridge. The effect applies errors automatically when the resource fails and clears them when it succeeds.
+When using `resource()` or `rxResource()`, wire the error signal to a FormBridge with a simple `effect()`. No dedicated helper needed -- the pattern is three lines:
 
 ```typescript
+import { effect, inject } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
-import { connectResource, provideFormBridge, djangoPreset } from 'ngx-api-forms';
+import { provideFormBridge } from 'ngx-api-forms';
+import { djangoPreset } from 'ngx-api-forms/django';
 
 @Component({ ... })
 export class EditComponent {
@@ -341,18 +374,16 @@ export class EditComponent {
     loader: () => this.http.put('/api/profile', this.form.value),
   });
 
-  // Wires saveResource.error() -> bridge.applyApiErrors()
-  // Clears errors automatically on success
-  private ref = connectResource(this.bridge, this.saveResource.error);
+  // Wire resource errors to the bridge
+  private errorEffect = effect(() => {
+    const error = this.saveResource.error();
+    if (error) {
+      this.bridge.applyApiErrors(error);
+    } else {
+      this.bridge.clearApiErrors();
+    }
+  });
 }
-```
-
-Works with any `Signal<unknown>` -- not limited to Angular resources. If called outside an injection context (e.g. `ngOnInit`), pass an explicit `Injector`:
-
-```typescript
-connectResource(this.bridge, this.myResource.error, {
-  injector: this.injector,
-});
 ```
 
 ## Typed Forms
@@ -379,7 +410,8 @@ bridge.form.controls.email; // FormControl<string> -- full autocompletion
 Parse API errors without a form. Works in interceptors, stores, effects, tests -- anywhere. Returns `ApiFieldError[]`.
 
 ```typescript
-import { parseApiErrors, laravelPreset } from 'ngx-api-forms';
+import { parseApiErrors } from 'ngx-api-forms';
+import { laravelPreset } from 'ngx-api-forms/laravel';
 
 const errors = parseApiErrors(err.error, laravelPreset());
 // [{ field: 'email', constraint: 'required', message: 'The email field is required.' }]
@@ -414,11 +446,10 @@ Create with `provideFormBridge(form, config?)` or `createFormBridge(form, config
 | `firstErrorSignal` | `Signal<FirstError \| null>` | First error, or null |
 | `hasErrorsSignal` | `Signal<boolean>` | Whether any API errors exist (field or global) |
 
-### Resource Integration
+### Constants
 
 | Export | Description |
 |--------|-------------|
-| `connectResource(bridge, errorSignal, options?)` | Wire a `Signal<unknown>` (e.g. `resource().error`) to a FormBridge. Returns `EffectRef` |
 | `GLOBAL_ERROR_FIELD` | Sentinel field name (`'__global__'`) used by presets to mark non-field errors |
 
 ### Standalone Utility Functions

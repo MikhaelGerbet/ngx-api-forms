@@ -16,7 +16,7 @@ import { FormBuilder, Validators } from '@angular/forms';
 
 import { createFormBridge } from '../form-bridge/form-bridge';
 import { classValidatorPreset } from '../presets/class-validator.preset';
-import { laravelPreset } from '../presets/laravel.preset';
+import { laravelPreset } from 'ngx-api-forms/laravel';
 import { apiErrorInterceptor, withFormBridge } from './api-error.interceptor';
 import { ApiFieldError, ResolvedFieldError } from '../models/api-forms.models';
 

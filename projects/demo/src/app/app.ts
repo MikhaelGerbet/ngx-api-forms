@@ -1,20 +1,21 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { HttpClient } from '@angular/common/http';
 import { JsonPipe } from '@angular/common';
 import { Observable } from 'rxjs';
 import {
   createFormBridge,
   provideFormBridge,
   classValidatorPreset,
-  laravelPreset,
-  djangoPreset,
-  zodPreset,
   parseApiErrors,
   wrapSubmit,
+  withFormBridge,
   NgxFormErrorDirective,
   ApiFieldError,
-  GlobalError,
 } from 'ngx-api-forms';
+import { laravelPreset } from 'ngx-api-forms/laravel';
+import { djangoPreset } from 'ngx-api-forms/django';
+import { zodPreset } from 'ngx-api-forms/zod';
 
 @Component({
   selector: 'app-root',
@@ -95,6 +96,22 @@ export class App {
   // ---- Standalone Parsing Demo ----
   standalonePreset = signal<string>('class-validator');
   standaloneResult = signal<string>('');
+
+  // ---- Live API Demo ----
+  private http = inject(HttpClient);
+
+  liveForm = this.fb.group({
+    email: ['', [Validators.required, Validators.email]],
+    username: ['', [Validators.required, Validators.minLength(3)]],
+    password: ['', [Validators.required, Validators.minLength(8)]],
+  });
+
+  liveBridge = provideFormBridge(this.liveForm, {
+    preset: djangoPreset(),
+  });
+
+  liveSubmitting = signal(false);
+  liveResult = signal<string>('');
 
   // ---- Global Errors Demo ----
   globalForm = this.fb.group({
@@ -393,6 +410,37 @@ export class App {
   clearGlobalErrors(): void {
     this.globalBridge.clearApiErrors();
     this.globalResult.set('');
+  }
+
+  // ---- Live API Demo ----
+
+  submitLiveForm(): void {
+    if (this.liveForm.invalid) {
+      this.liveForm.markAllAsTouched();
+      return;
+    }
+
+    this.liveSubmitting.set(true);
+    this.liveResult.set('');
+    this.liveBridge.clearApiErrors();
+
+    this.http.post('/mock-api/register', this.liveForm.value, withFormBridge(this.liveBridge))
+      .subscribe({
+        next: (res) => {
+          this.liveSubmitting.set(false);
+          this.liveResult.set('Success: ' + JSON.stringify(res, null, 2));
+        },
+        error: () => {
+          this.liveSubmitting.set(false);
+          this.liveResult.set('Errors applied via apiErrorInterceptor + withFormBridge');
+        },
+      });
+  }
+
+  resetLiveForm(): void {
+    this.liveForm.reset();
+    this.liveBridge.clearApiErrors();
+    this.liveResult.set('');
   }
 
   // ---- Utils ----

@@ -12,9 +12,9 @@ import { FormBuilder, Validators } from '@angular/forms';
 
 import { createFormBridge } from '../form-bridge/form-bridge';
 import { classValidatorPreset } from '../presets/class-validator.preset';
-import { laravelPreset } from '../presets/laravel.preset';
-import { djangoPreset } from '../presets/django.preset';
-import { zodPreset } from '../presets/zod.preset';
+import { laravelPreset } from 'ngx-api-forms/laravel';
+import { djangoPreset } from 'ngx-api-forms/django';
+import { zodPreset } from 'ngx-api-forms/zod';
 import { parseApiErrors } from '../utils/form-utils';
 
 describe('HttpClient Integration', () => {

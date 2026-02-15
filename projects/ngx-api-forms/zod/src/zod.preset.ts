@@ -20,7 +20,7 @@
  * ]
  * ```
  */
-import { ApiFieldError, ErrorPreset, GLOBAL_ERROR_FIELD, ZodFlatError } from '../models/api-forms.models';
+import { ApiFieldError, ConstraintMap, ErrorPreset, GLOBAL_ERROR_FIELD, ZodFlatError } from 'ngx-api-forms';
 
 interface ZodIssue {
   code: string;
@@ -75,6 +75,26 @@ function zodCodeToConstraint(issue: ZodIssue): string {
 }
 
 /**
+ * Default constraint map for Zod.
+ */
+export const ZOD_CONSTRAINT_MAP: ConstraintMap = {
+  required: 'required',
+  email: 'email',
+  url: 'url',
+  uuid: 'uuid',
+  minlength: 'minlength',
+  maxlength: 'maxlength',
+  min: 'min',
+  max: 'max',
+  regex: 'pattern',
+  enum: 'enum',
+  date: 'date',
+  custom: 'custom',
+  invalid: 'invalid',
+  serverError: 'serverError',
+};
+
+/**
  * Creates a Zod error preset.
  *
  * Supports both `.flatten()` and raw `.issues` formats.
@@ -85,7 +105,7 @@ function zodCodeToConstraint(issue: ZodIssue): string {
  *
  * @example
  * ```typescript
- * import { zodPreset } from 'ngx-api-forms';
+ * import { zodPreset } from 'ngx-api-forms/zod';
  *
  * const bridge = createFormBridge(form, { preset: zodPreset() });
  *
@@ -97,6 +117,7 @@ export function zodPreset(options?: { noInference?: boolean }): ErrorPreset {
   const skipInference = options?.noInference ?? false;
   return {
     name: 'zod',
+    constraintMap: ZOD_CONSTRAINT_MAP,
     parse(error: unknown): ApiFieldError[] {
       if (!error || typeof error !== 'object') return [];
 
@@ -179,23 +200,3 @@ export function zodPreset(options?: { noInference?: boolean }): ErrorPreset {
     },
   };
 }
-
-/**
- * Default constraint map for Zod.
- */
-export const ZOD_CONSTRAINT_MAP: Record<string, string> = {
-  required: 'required',
-  email: 'email',
-  url: 'url',
-  uuid: 'uuid',
-  minlength: 'minlength',
-  maxlength: 'maxlength',
-  min: 'min',
-  max: 'max',
-  regex: 'pattern',
-  enum: 'enum',
-  date: 'date',
-  custom: 'custom',
-  invalid: 'invalid',
-  serverError: 'serverError',
-};

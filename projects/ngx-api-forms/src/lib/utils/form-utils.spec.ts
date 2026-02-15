@@ -11,8 +11,8 @@ import {
   parseApiErrors,
   wrapSubmit,
 } from './form-utils';
-import { laravelPreset } from '../presets/laravel.preset';
-import { zodPreset } from '../presets/zod.preset';
+import { laravelPreset } from 'ngx-api-forms/laravel';
+import { zodPreset } from 'ngx-api-forms/zod';
 
 describe('Form Utilities', () => {
   let fb: FormBuilder;

@@ -81,7 +81,7 @@ this.http.post('/api', data).subscribe(&#123;
         </div>
         <div class="why-card">
           <h3>Native Signals</h3>
-          <p>Reactive error state via <code>errorsSignal</code>, <code>globalErrorsSignal</code>, <code>hasErrorsSignal</code>. Works with <code>resource()</code> via <code>connectResource()</code>.</p>
+          <p>Reactive error state via <code>errorsSignal</code>, <code>globalErrorsSignal</code>, <code>hasErrorsSignal</code>. Zero zone dependency.</p>
         </div>
         <div class="why-card">
           <h3>Zero Dependencies</h3>
@@ -555,6 +555,125 @@ bridge.clearApiErrors();</code></pre>
       </div>
     </section>
 
+    <!-- Live API Demo -->
+    <section class="demo-section live-api-demo">
+      <h2>Live API Demo</h2>
+      <p>This form makes real <code>HttpClient.post()</code> calls through <code>apiErrorInterceptor()</code> and <code>withFormBridge()</code>. The mock API returns Django-style 422 errors. Errors are applied to the form automatically - zero error handling code in the component.</p>
+
+      <div class="demo-layout">
+        <div class="demo-form-side">
+          <h3>Registration Form</h3>
+          <form [formGroup]="liveForm" class="sample-form" (ngSubmit)="submitLiveForm()">
+            <div class="form-field">
+              <label for="live-email">Email</label>
+              <input id="live-email" type="email" formControlName="email" placeholder="user@example.com">
+              <span ngxFormError="email" [form]="liveForm" class="field-error"></span>
+            </div>
+            <div class="form-field">
+              <label for="live-username">Username</label>
+              <input id="live-username" type="text" formControlName="username" placeholder="johndoe">
+              <span ngxFormError="username" [form]="liveForm" class="field-error"></span>
+            </div>
+            <div class="form-field">
+              <label for="live-password">Password</label>
+              <input id="live-password" type="password" formControlName="password" placeholder="--------">
+              <span ngxFormError="password" [form]="liveForm" class="field-error"></span>
+            </div>
+          </form>
+
+          <div class="demo-controls">
+            <div class="info-box">
+              <p>Try submitting empty, or use <code>taken&#64;example.com</code> to trigger global errors.</p>
+            </div>
+            <div class="demo-buttons">
+              <button class="btn btn-primary" (click)="submitLiveForm()" [disabled]="liveSubmitting()">
+                @if (liveSubmitting()) {
+                  Sending...
+                } @else {
+                  Register
+                }
+              </button>
+              <button class="btn btn-ghost" (click)="resetLiveForm()">Reset</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="demo-result-side">
+          <h3>State</h3>
+          <div class="signals-panel">
+            <div class="signal-row">
+              <span class="signal-label">isSubmitting:</span>
+              <span class="signal-value" [class.active]="liveSubmitting()">{{ liveSubmitting() }}</span>
+            </div>
+            <div class="signal-row">
+              <span class="signal-label">hasErrors:</span>
+              <span class="signal-value" [class.active]="liveBridge.hasErrorsSignal()">{{ liveBridge.hasErrorsSignal() }}</span>
+            </div>
+            <div class="signal-row">
+              <span class="signal-label">fieldErrors:</span>
+              <span class="signal-value">{{ liveBridge.errorsSignal().length }}</span>
+            </div>
+            <div class="signal-row">
+              <span class="signal-label">globalErrors:</span>
+              <span class="signal-value" [class.active]="liveBridge.globalErrorsSignal().length > 0">{{ liveBridge.globalErrorsSignal().length }}</span>
+            </div>
+          </div>
+
+          @if (liveBridge.globalErrorsSignal().length > 0) {
+            <div class="info-box" style="margin-top: 1rem; border-left-color: #ef4444;">
+              <p><strong>Global errors:</strong></p>
+              @for (err of liveBridge.globalErrorsSignal(); track $index) {
+                <p style="margin: 0.25rem 0;">{{ err.message }}</p>
+              }
+            </div>
+          }
+
+          @if (liveResult()) {
+            <h3>Result</h3>
+            <div class="result-panel">
+              <pre><code>{{ liveResult() }}</code></pre>
+            </div>
+          }
+        </div>
+      </div>
+
+      <div class="code-tabs">
+        <h3>Implementation</h3>
+        <div class="code-block">
+          <div class="code-header">
+            <span>app.config.ts</span>
+          </div>
+          <pre><code>import &#123; apiErrorInterceptor &#125; from 'ngx-api-forms';
+
+export const appConfig = &#123;
+  providers: [
+    provideHttpClient(
+      withInterceptors([apiErrorInterceptor()])
+    ),
+  ],
+&#125;;</code></pre>
+        </div>
+        <div class="code-block">
+          <div class="code-header">
+            <span>component.ts</span>
+          </div>
+          <pre><code>import &#123; withFormBridge, provideFormBridge &#125; from 'ngx-api-forms';
+import &#123; djangoPreset &#125; from 'ngx-api-forms/django';
+
+bridge = provideFormBridge(this.form, &#123; preset: djangoPreset() &#125;);
+
+onSubmit() &#123;
+  // Zero error handling - interceptor + withFormBridge does it
+  this.http.post('/api/register', this.form.value,
+    withFormBridge(this.bridge)
+  ).subscribe(&#123;
+    next: (res) =&gt; this.router.navigate(['/done']),
+  &#125;);
+&#125;</code></pre>
+        </div>
+      </div>
+    </section>
+
     <!-- Standalone Parsing Demo -->
     <section class="demo-section standalone-demo">
       <h2>Standalone Parsing</h2>
@@ -740,11 +859,15 @@ errorStore.setFieldErrors(errors);</code></pre>
       </div>
       <div class="code-block">
         <div class="code-header">
-          <span>ng add</span>
-          <button class="copy-btn" (click)="copyToClipboard('ng add ngx-api-forms --preset=laravel')">Copy</button>
+          <span>Import presets from secondary entry points</span>
         </div>
-        <pre><code>ng add ngx-api-forms --preset=laravel
-# Options: laravel, django, class-validator, zod</code></pre>
+        <pre><code>// Core (FormBridge, classValidatorPreset, utilities)
+import &#123; provideFormBridge, classValidatorPreset &#125; from 'ngx-api-forms';
+
+// Other presets (tree-shakeable, separate bundles)
+import &#123; djangoPreset &#125; from 'ngx-api-forms/django';
+import &#123; laravelPreset &#125; from 'ngx-api-forms/laravel';
+import &#123; zodPreset &#125; from 'ngx-api-forms/zod';</code></pre>
       </div>
     </section>
 
@@ -816,9 +939,10 @@ export class MyComponent &#123;
             <tr><th>Signal</th><th>Type</th><th>Description</th></tr>
           </thead>
           <tbody>
-            <tr><td><code>errorsSignal</code></td><td><code>Signal&lt;ResolvedFieldError[]&gt;</code></td><td>All current API errors</td></tr>
+            <tr><td><code>errorsSignal</code></td><td><code>Signal&lt;ResolvedFieldError[]&gt;</code></td><td>All current field-level API errors</td></tr>
+            <tr><td><code>globalErrorsSignal</code></td><td><code>Signal&lt;GlobalError[]&gt;</code></td><td>Non-field errors (Django <code>non_field_errors</code>, Zod <code>formErrors</code>, unmatched fields)</td></tr>
             <tr><td><code>firstErrorSignal</code></td><td><code>Signal&lt;FirstError | null&gt;</code></td><td>First error or null</td></tr>
-            <tr><td><code>hasErrorsSignal</code></td><td><code>Signal&lt;boolean&gt;</code></td><td>Whether any API errors exist</td></tr>
+            <tr><td><code>hasErrorsSignal</code></td><td><code>Signal&lt;boolean&gt;</code></td><td>Whether any API errors exist (field or global)</td></tr>
           </tbody>
         </table>
       </div>

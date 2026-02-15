@@ -104,6 +104,7 @@ export function classValidatorPreset(options?: { noInference?: boolean }): Error
   const skipInference = options?.noInference ?? false;
   return {
     name: 'class-validator',
+    constraintMap: CLASS_VALIDATOR_CONSTRAINT_MAP,
     parse(error: unknown): ApiFieldError[] {
       if (!error || typeof error !== 'object') return [];
 

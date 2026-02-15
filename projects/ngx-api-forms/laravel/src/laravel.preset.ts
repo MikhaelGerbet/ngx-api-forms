@@ -12,7 +12,7 @@
  * }
  * ```
  */
-import { ApiFieldError, ErrorPreset, LaravelValidationErrors } from '../models/api-forms.models';
+import { ApiFieldError, ConstraintMap, ErrorPreset, LaravelValidationErrors } from 'ngx-api-forms';
 
 /**
  * Infers a constraint key from a Laravel validation message.
@@ -20,7 +20,7 @@ import { ApiFieldError, ErrorPreset, LaravelValidationErrors } from '../models/a
  * @remarks
  * This function relies on English-language pattern matching (e.g. "is required",
  * "must be a valid email"). If your Laravel backend returns translated messages,
- * the inference will fall back to 'invalid'. In that case, use a `constraintMap`
+ * the inference will fall back to 'serverError'. In that case, use a `constraintMap`
  * in your FormBridgeConfig or write a custom preset.
  */
 function inferConstraint(message: string): string {
@@ -49,6 +49,31 @@ function inferConstraint(message: string): string {
 }
 
 /**
+ * Default constraint map for Laravel.
+ */
+export const LARAVEL_CONSTRAINT_MAP: ConstraintMap = {
+  required: 'required',
+  email: 'email',
+  minlength: 'minlength',
+  maxlength: 'maxlength',
+  min: 'min',
+  max: 'max',
+  number: 'number',
+  integer: 'integer',
+  date: 'date',
+  url: 'url',
+  unique: 'unique',
+  pattern: 'pattern',
+  phone: 'phone',
+  invalid: 'invalid',
+  accepted: 'accepted',
+  confirmed: 'confirmed',
+  file: 'file',
+  image: 'image',
+  serverError: 'serverError',
+};
+
+/**
  * Creates a Laravel validation error preset.
  *
  * @param options.noInference - When true, skips English-language constraint guessing.
@@ -57,7 +82,7 @@ function inferConstraint(message: string): string {
  *
  * @example
  * ```typescript
- * import { laravelPreset } from 'ngx-api-forms';
+ * import { laravelPreset } from 'ngx-api-forms/laravel';
  *
  * // Default: infer constraint from English messages
  * const bridge = createFormBridge(form, { preset: laravelPreset() });
@@ -70,6 +95,7 @@ export function laravelPreset(options?: { noInference?: boolean }): ErrorPreset 
   const skipInference = options?.noInference ?? false;
   return {
     name: 'laravel',
+    constraintMap: LARAVEL_CONSTRAINT_MAP,
     parse(error: unknown): ApiFieldError[] {
       if (!error || typeof error !== 'object') return [];
 
@@ -110,28 +136,3 @@ export function laravelPreset(options?: { noInference?: boolean }): ErrorPreset 
     },
   };
 }
-
-/**
- * Default constraint map for Laravel.
- */
-export const LARAVEL_CONSTRAINT_MAP: Record<string, string> = {
-  required: 'required',
-  email: 'email',
-  minlength: 'minlength',
-  maxlength: 'maxlength',
-  min: 'min',
-  max: 'max',
-  number: 'number',
-  integer: 'integer',
-  date: 'date',
-  url: 'url',
-  unique: 'unique',
-  pattern: 'pattern',
-  phone: 'phone',
-  invalid: 'invalid',
-  accepted: 'accepted',
-  confirmed: 'confirmed',
-  file: 'file',
-  image: 'image',
-  serverError: 'serverError',
-};

@@ -8,11 +8,8 @@ export * from './lib/models/api-forms.models';
 // Core
 export { FormBridge, createFormBridge, provideFormBridge } from './lib/form-bridge/form-bridge';
 
-// Presets
-export { classValidatorPreset } from './lib/presets/class-validator.preset';
-export { laravelPreset } from './lib/presets/laravel.preset';
-export { djangoPreset } from './lib/presets/django.preset';
-export { zodPreset } from './lib/presets/zod.preset';
+// Presets (default only - others available via secondary entry points)
+export { classValidatorPreset, CLASS_VALIDATOR_CONSTRAINT_MAP } from './lib/presets/class-validator.preset';
 
 // Directives
 export { NgxFormErrorDirective } from './lib/directives/form-error.directive';
@@ -24,10 +21,6 @@ export {
   FORM_BRIDGE,
 } from './lib/interceptor/api-error.interceptor';
 export type { ApiErrorInterceptorConfig } from './lib/interceptor/api-error.interceptor';
-
-// Resource integration
-export { connectResource } from './lib/resource/connect-resource';
-export type { ConnectResourceOptions } from './lib/resource/connect-resource';
 
 // Utility functions (tree-shakeable)
 export {

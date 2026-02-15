@@ -103,6 +103,13 @@ export interface ErrorPreset {
    * Should return an empty array if the format is not recognized.
    */
   parse(error: unknown): ApiFieldError[];
+
+  /**
+   * Optional constraint map shipped with this preset.
+   * When provided, FormBridge merges it into its constraint resolution table
+   * automatically - no need to pass a `constraintMap` in the config.
+   */
+  readonly constraintMap?: ConstraintMap;
 }
 
 // ---------------------------------------------------------------------------

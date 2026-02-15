@@ -23,17 +23,7 @@ import {
   ResolvedFieldError,
 } from '../models/api-forms.models';
 import { CLASS_VALIDATOR_CONSTRAINT_MAP, classValidatorPreset } from '../presets/class-validator.preset';
-import { LARAVEL_CONSTRAINT_MAP } from '../presets/laravel.preset';
-import { DJANGO_CONSTRAINT_MAP } from '../presets/django.preset';
-import { ZOD_CONSTRAINT_MAP } from '../presets/zod.preset';
 
-/** Maps preset names to their default constraint maps */
-const PRESET_CONSTRAINT_MAPS: Record<string, ConstraintMap> = {
-  'class-validator': CLASS_VALIDATOR_CONSTRAINT_MAP,
-  laravel: LARAVEL_CONSTRAINT_MAP,
-  django: DJANGO_CONSTRAINT_MAP,
-  zod: ZOD_CONSTRAINT_MAP,
-};
 
 /**
  * FormBridge wraps an Angular FormGroup and provides a clean API
@@ -243,10 +233,9 @@ export class FormBridge<T extends FormGroup = FormGroup> {
   private _resolvePresetConstraintMap(presets: ErrorPreset[]): ConstraintMap {
     const merged: ConstraintMap = {};
     for (const preset of presets) {
-      const map = PRESET_CONSTRAINT_MAPS[preset.name];
-      if (map) Object.assign(merged, map);
+      if (preset.constraintMap) Object.assign(merged, preset.constraintMap);
     }
-    // If no preset maps found, fall back to class-validator
+    // If no preset provided a constraint map, fall back to class-validator
     if (Object.keys(merged).length === 0) {
       Object.assign(merged, CLASS_VALIDATOR_CONSTRAINT_MAP);
     }

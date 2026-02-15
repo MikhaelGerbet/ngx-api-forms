@@ -1,7 +1,7 @@
 import { classValidatorPreset } from './class-validator.preset';
-import { laravelPreset } from './laravel.preset';
-import { djangoPreset } from './django.preset';
-import { zodPreset } from './zod.preset';
+import { laravelPreset } from 'ngx-api-forms/laravel';
+import { djangoPreset } from 'ngx-api-forms/django';
+import { zodPreset } from 'ngx-api-forms/zod';
 import { GLOBAL_ERROR_FIELD } from '../models/api-forms.models';
 
 describe('Error Presets', () => {

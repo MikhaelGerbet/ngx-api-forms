@@ -43,12 +43,21 @@ jobs:
 
       - name: Check bundle size
         run: |
-          MAX_SIZE_KB=52
-          FESM_FILE=$(find dist/ngx-api-forms/fesm2022 -name '*.mjs' | head -1)
-          SIZE_KB=$(( $(wc -c < "$FESM_FILE") / 1024 ))
-          echo "Bundle size: ${SIZE_KB}KB (max: ${MAX_SIZE_KB}KB)"
-          if [ "$SIZE_KB" -gt "$MAX_SIZE_KB" ]; then
-            echo "::error::Bundle size ${SIZE_KB}KB exceeds limit of ${MAX_SIZE_KB}KB"
+          MAX_CORE_KB=35
+          TOTAL_SIZE=0
+          for f in $(find dist/ngx-api-forms/fesm2022 -name '*.mjs'); do
+            SIZE=$(wc -c < "$f")
+            NAME=$(basename "$f")
+            echo "  $NAME: $(( SIZE / 1024 ))KB ($SIZE bytes)"
+            TOTAL_SIZE=$(( TOTAL_SIZE + SIZE ))
+          done
+          TOTAL_KB=$(( TOTAL_SIZE / 1024 ))
+          echo "Total bundle size: ${TOTAL_KB}KB"
+          CORE_FILE=$(find dist/ngx-api-forms/fesm2022 -maxdepth 1 -name 'ngx-api-forms.mjs')
+          CORE_KB=$(( $(wc -c < "$CORE_FILE") / 1024 ))
+          echo "Core entry point: ${CORE_KB}KB (max: ${MAX_CORE_KB}KB)"
+          if [ "$CORE_KB" -gt "$MAX_CORE_KB" ]; then
+            echo "::error::Core bundle size ${CORE_KB}KB exceeds limit of ${MAX_CORE_KB}KB"
             exit 1
           fi
 
