@@ -191,6 +191,20 @@ describe('Form Utilities', () => {
       expect(parseApiErrors(null)).toEqual([]);
       expect(parseApiErrors(42)).toEqual([]);
     });
+
+    it('should warn in debug mode when no preset matches', () => {
+      spyOn(console, 'warn');
+      parseApiErrors('not a valid payload', undefined, { debug: true });
+      expect(console.warn).toHaveBeenCalled();
+      const args = (console.warn as jasmine.Spy).calls.first().args;
+      expect(args[0]).toContain('no preset produced results');
+    });
+
+    it('should not warn when debug is false', () => {
+      spyOn(console, 'warn');
+      parseApiErrors('not a valid payload', undefined, { debug: false });
+      expect(console.warn).not.toHaveBeenCalled();
+    });
   });
 
   describe('wrapSubmit', () => {

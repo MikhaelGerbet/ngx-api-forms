@@ -854,4 +854,57 @@ describe('FormBridge', () => {
       expect(resolved[0].message).toBe('email must be valid');
     });
   });
+
+  describe('debug mode', () => {
+    it('should warn when no preset produces results', () => {
+      spyOn(console, 'warn');
+      const bridge = createFormBridge(form, {
+        preset: classValidatorPreset(),
+        debug: true,
+      });
+
+      bridge.applyApiErrors({ random: 'unrecognized payload' });
+
+      expect(console.warn).toHaveBeenCalled();
+      const args = (console.warn as jasmine.Spy).calls.first().args;
+      expect(args[0]).toContain('No preset produced results');
+    });
+
+    it('should warn when a field does not match any form control', () => {
+      spyOn(console, 'warn');
+      const bridge = createFormBridge(form, {
+        preset: classValidatorPreset(),
+        debug: true,
+      });
+
+      bridge.applyApiErrors({
+        message: [
+          { property: 'unknownField', constraints: { isNotEmpty: 'should not be empty' } },
+        ],
+      });
+
+      expect(console.warn).toHaveBeenCalledWith(
+        jasmine.stringContaining('unknownField'),
+        jasmine.anything(),
+        jasmine.anything(),
+      );
+    });
+
+    it('should not warn when debug is false', () => {
+      spyOn(console, 'warn');
+      const bridge = createFormBridge(form, {
+        preset: classValidatorPreset(),
+        debug: false,
+      });
+
+      bridge.applyApiErrors({ random: 'unrecognized' });
+      bridge.applyApiErrors({
+        message: [
+          { property: 'ghost', constraints: { isNotEmpty: 'nope' } },
+        ],
+      });
+
+      expect(console.warn).not.toHaveBeenCalled();
+    });
+  });
 });

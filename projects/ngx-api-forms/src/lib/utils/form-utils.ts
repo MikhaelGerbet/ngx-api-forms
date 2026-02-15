@@ -16,6 +16,7 @@ import { classValidatorPreset } from '../presets/class-validator.preset';
  *
  * @param apiError - The raw error body from the API (e.g. `err.error`)
  * @param preset - One or more presets to try. Defaults to class-validator.
+ * @param options - Optional settings. `debug: true` logs a warning when no preset matches.
  * @returns Normalized array of field errors
  *
  * @example
@@ -29,6 +30,7 @@ import { classValidatorPreset } from '../presets/class-validator.preset';
 export function parseApiErrors(
   apiError: unknown,
   preset?: ErrorPreset | ErrorPreset[],
+  options?: { debug?: boolean },
 ): ApiFieldError[] {
   const presets = preset
     ? (Array.isArray(preset) ? preset : [preset])
@@ -38,6 +40,15 @@ export function parseApiErrors(
     const result = p.parse(apiError);
     if (result.length > 0) return result;
   }
+
+  if (options?.debug) {
+    console.warn(
+      '[ngx-api-forms] parseApiErrors: no preset produced results.',
+      'Presets tried:', presets.map(p => p.name).join(', '),
+      'Payload:', apiError,
+    );
+  }
+
   return [];
 }
 

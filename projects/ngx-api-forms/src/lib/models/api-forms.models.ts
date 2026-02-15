@@ -144,6 +144,15 @@ export interface FormBridgeConfig {
    * replace existing errors on affected controls.
    */
   mergeErrors?: boolean;
+
+  /**
+   * When true, logs warnings to the console when:
+   * - No preset produces results for a given error payload.
+   * - A parsed error field does not match any form control.
+   *
+   * Useful during development. Should be disabled in production.
+   */
+  debug?: boolean;
 }
 
 // ---------------------------------------------------------------------------

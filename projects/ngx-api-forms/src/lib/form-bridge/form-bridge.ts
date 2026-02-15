@@ -64,6 +64,7 @@ export class FormBridge<T extends FormGroup = FormGroup> {
   private readonly _i18n: I18nConfig | undefined;
   private readonly _catchAll: boolean;
   private readonly _mergeErrors: boolean;
+  private readonly _debug: boolean;
   private readonly _defaultValues: Record<string, unknown> = {};
   private _interceptors: ErrorInterceptor[] = [];
   private _valueChangesSub: Subscription | null = null;
@@ -101,6 +102,7 @@ export class FormBridge<T extends FormGroup = FormGroup> {
     this._form = form;
     this._catchAll = config?.catchAll ?? false;
     this._mergeErrors = config?.mergeErrors ?? false;
+    this._debug = config?.debug ?? false;
     this._i18n = config?.i18n;
 
     // Resolve presets
@@ -152,6 +154,14 @@ export class FormBridge<T extends FormGroup = FormGroup> {
     for (const preset of this._presets) {
       fieldErrors = preset.parse(apiError);
       if (fieldErrors.length > 0) break;
+    }
+
+    if (this._debug && fieldErrors.length === 0) {
+      console.warn(
+        '[ngx-api-forms] No preset produced results for the given error payload.',
+        'Presets tried:', this._presets.map(p => p.name).join(', '),
+        'Payload:', apiError,
+      );
     }
 
     // Run interceptors
@@ -239,6 +249,9 @@ export class FormBridge<T extends FormGroup = FormGroup> {
    * - On error: re-enables the form and applies API errors
    *
    * The error is re-thrown so your subscriber's error handler still runs.
+   *
+   * @deprecated Use the standalone `wrapSubmit()` function instead.
+   * `wrapSubmit` is tree-shakeable and does not couple submit logic to FormBridge.
    *
    * @param source - The Observable to wrap (e.g. an HttpClient call)
    * @param options.extractError - Custom function to extract the error body (default: err.error ?? err)
@@ -392,7 +405,15 @@ export class FormBridge<T extends FormGroup = FormGroup> {
       if (!control) {
         // Try nested path (e.g. 'address.city' or 'items.0.name')
         control = this._resolveNestedControl(fieldError.field);
-        if (!control) continue;
+        if (!control) {
+          if (this._debug) {
+            console.warn(
+              `[ngx-api-forms] Field "${fieldError.field}" does not match any form control.`,
+              'Available controls:', Object.keys(this._form.controls).join(', '),
+            );
+          }
+          continue;
+        }
       }
 
       const errorKey = this._resolveErrorKey(fieldError.constraint);

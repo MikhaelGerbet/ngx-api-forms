@@ -203,7 +203,7 @@ bridge.form.controls.email; // FormControl<string> - full autocompletion
 | `enable(options?)` | `void` | Enable controls (supports `except` list) |
 | `disable(options?)` | `void` | Disable controls (supports `except` list) |
 | `toFormData(values?)` | `FormData` | Convert form values to FormData |
-| `handleSubmit(source)` | `Observable<T>` | Wrap an Observable: disable form, apply errors on failure, re-enable |
+| `handleSubmit(source)` | `Observable<T>` | *(deprecated)* Wrap an Observable: disable form, apply errors on failure, re-enable. Use standalone `wrapSubmit()` instead. |
 | `addInterceptor(fn)` | `() => void` | Register an error interceptor. Returns a dispose function |
 | `checkDirty()` | `boolean` | Check if form differs from defaults |
 | `destroy()` | `void` | Clean up internal subscriptions |
@@ -212,7 +212,7 @@ bridge.form.controls.email; // FormControl<string> - full autocompletion
 
 | Function | Description |
 |----------|-------------|
-| `parseApiErrors(error, preset?)` | Parse API errors without a form. Works in interceptors, stores, effects. |
+| `parseApiErrors(error, preset?, options?)` | Parse API errors without a form. Works in interceptors, stores, effects. Pass `{ debug: true }` to log warnings. |
 | `wrapSubmit(form, source, options?)` | Submit lifecycle (disable/enable) without FormBridge. |
 | `toFormData(data)` | Convert a plain object to FormData. Handles Files, Blobs, Arrays, nested objects. |
 | `enableForm(form, options?)` | Enable all controls, with optional `except` list. |
@@ -244,6 +244,7 @@ interface FormBridgeConfig {
   };
   catchAll?: boolean;     // Apply unmatched errors as { generic: msg }
   mergeErrors?: boolean;  // Merge with existing errors instead of replacing
+  debug?: boolean;        // Log warnings when presets or fields don't match
 }
 ```
 
@@ -289,11 +290,34 @@ export const apiErrorInterceptor: HttpInterceptorFn = (req, next) => {
 
 Components can then read from the error store, or still use `bridge.applyApiErrors()` for form-specific handling.
 
+## Debug Mode
+
+Set `debug: true` in the configuration to log warnings during development:
+
+```typescript
+const bridge = createFormBridge(form, {
+  preset: laravelPreset(),
+  debug: true,
+});
+```
+
+The library will warn when:
+- No preset produces results for a given error payload (the format might be wrong or unsupported).
+- A parsed error field does not match any form control (possible typo or missing control).
+
+The standalone `parseApiErrors` also supports debug mode:
+
+```typescript
+const errors = parseApiErrors(err.error, laravelPreset(), { debug: true });
+```
+
+Disable debug in production builds.
+
 ## Submit and Loading State
 
-### With FormBridge
+### With FormBridge (deprecated)
 
-`handleSubmit()` wraps an Observable and handles the full submit lifecycle: disabling the form, tracking loading state via `isSubmittingSignal`, and applying API errors on failure.
+`handleSubmit()` is kept for backward compatibility but is deprecated in favor of standalone `wrapSubmit()`. It wraps an Observable and handles the full submit lifecycle: disabling the form, tracking loading state via `isSubmittingSignal`, and applying API errors on failure.
 
 ```typescript
 onSubmit() {
