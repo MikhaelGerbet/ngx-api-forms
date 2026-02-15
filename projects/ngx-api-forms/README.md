@@ -271,12 +271,67 @@ const dispose = bridge.addInterceptor((errors, form) => {
 // Later: dispose() to remove the interceptor
 ```
 
+### Standalone Parsing (no FormBridge needed)
+
+`parseApiErrors` extracts and normalizes errors from any API response without touching a form. Useful in HttpInterceptors, NgRx effects, or any context where you don't have a FormBridge.
+
+```typescript
+import { parseApiErrors, laravelPreset } from 'ngx-api-forms';
+
+const errors = parseApiErrors(apiResponse, laravelPreset());
+// Returns: [{ field: 'email', constraint: 'required', message: 'The email field is required.' }]
+
+// Multi-preset: tries each until one matches
+const errors = parseApiErrors(body, [zodPreset(), classValidatorPreset()]);
+```
+
+### Global Error Handling with HttpInterceptor
+
+`parseApiErrors` integrates cleanly with Angular's functional interceptors to centralize error extraction:
+
+```typescript
+import { HttpInterceptorFn, HttpErrorResponse } from '@angular/common/http';
+import { inject } from '@angular/core';
+import { catchError, throwError } from 'rxjs';
+import { parseApiErrors, classValidatorPreset } from 'ngx-api-forms';
+
+export const apiErrorInterceptor: HttpInterceptorFn = (req, next) => {
+  const errorStore = inject(ErrorStore); // your error store/service
+
+  return next(req).pipe(
+    catchError((err: HttpErrorResponse) => {
+      if (err.status === 422 || err.status === 400) {
+        const fieldErrors = parseApiErrors(err.error, classValidatorPreset());
+        errorStore.setFieldErrors(fieldErrors);
+      }
+      return throwError(() => err);
+    }),
+  );
+};
+```
+
+### Standalone Submit Helper
+
+`wrapSubmit` handles the disable/enable lifecycle without requiring a FormBridge:
+
+```typescript
+import { wrapSubmit } from 'ngx-api-forms';
+
+wrapSubmit(this.form, this.http.post('/api', data), {
+  onError: (err) => this.bridge.applyApiErrors(err.error),
+}).subscribe({
+  next: () => this.router.navigate(['/done']),
+});
+```
+
 ### Standalone Utility Functions
 
 All utility functions are tree-shakeable and can be used independently of FormBridge.
 
 ```typescript
 import {
+  parseApiErrors,
+  wrapSubmit,
   toFormData,
   enableForm,
   disableForm,
@@ -334,6 +389,49 @@ export function myBackendPreset(): ErrorPreset {
 | ngx-api-forms | Angular |
 |:---:|:---:|
 | 1.x | 17.x, 18.x, 19.x, 20.x |
+
+## Typed Forms
+
+`FormBridge` is generic. When you pass a typed `FormGroup`, the `form` getter preserves the type:
+
+```typescript
+interface LoginForm {
+  email: FormControl<string>;
+  password: FormControl<string>;
+}
+
+const form = new FormGroup<LoginForm>({ ... });
+const bridge = createFormBridge(form);
+
+// bridge.form is typed as FormGroup<LoginForm>
+bridge.form.controls.email; // FormControl<string>
+```
+
+## Constraint Inference Limitations
+
+The Laravel, Django, and Zod presets infer constraint types (e.g. "required", "email") by pattern-matching on the English text of error messages. This works well with default backend messages but has known limitations:
+
+- **Translated messages**: If your backend returns messages in French, Spanish, or any non-English language, the inference will fall back to `'invalid'` for most constraints.
+- **Custom messages**: If you override default validation messages on the backend, inference may not match.
+- **NestJS/class-validator does not have this limitation** because it transmits the constraint key directly (e.g. `isEmail`, `isNotEmpty`).
+
+When inference fails, you have two options:
+
+```typescript
+// Option 1: Custom constraintMap
+const bridge = createFormBridge(form, {
+  preset: laravelPreset(),
+  constraintMap: { 'mon_erreur_custom': 'required' },
+});
+
+// Option 2: Use catchAll
+const bridge = createFormBridge(form, {
+  preset: laravelPreset(),
+  catchAll: true,
+});
+
+// Option 3: Write a custom preset for full control
+```
 
 ## Contributing
 

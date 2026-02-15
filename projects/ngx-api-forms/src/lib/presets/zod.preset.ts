@@ -31,6 +31,16 @@ interface ZodIssue {
   validation?: string;
 }
 
+/**
+ * Infers a constraint key from a Zod error message string.
+ *
+ * @remarks
+ * Used only for the flattened format (`ZodError.flatten()`), where the structured
+ * `code` field is not available. Relies on English-language pattern matching.
+ * The raw issues format uses `zodCodeToConstraint` instead, which is language-independent.
+ * If your Zod messages are customized or translated, prefer returning raw issues
+ * (`ZodError.issues`) rather than the flattened format.
+ */
 function inferConstraintFromMessage(message: string): string {
   const lower = message.toLowerCase();
   if (lower.includes('required') || lower.includes('invalid_type')) return 'required';

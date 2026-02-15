@@ -2,7 +2,84 @@
  * Standalone utility functions for common form operations.
  * These are tree-shakeable and don't require DI.
  */
-import { FormGroup } from '@angular/forms';
+import { FormGroup, AbstractControl } from '@angular/forms';
+import { Observable, tap, catchError } from 'rxjs';
+import { ApiFieldError, ErrorPreset } from '../models/api-forms.models';
+import { classValidatorPreset } from '../presets/class-validator.preset';
+
+/**
+ * Parse raw API error body into normalized field errors without touching any form.
+ * Tries each preset in order until one returns results.
+ *
+ * Use this when you only need the parsing logic (e.g. in an HttpInterceptor,
+ * a store effect, or any context where you don't have a FormBridge).
+ *
+ * @param apiError - The raw error body from the API (e.g. `err.error`)
+ * @param preset - One or more presets to try. Defaults to class-validator.
+ * @returns Normalized array of field errors
+ *
+ * @example
+ * ```typescript
+ * import { parseApiErrors, laravelPreset } from 'ngx-api-forms';
+ *
+ * const errors = parseApiErrors(err.error, laravelPreset());
+ * // [{ field: 'email', constraint: 'required', message: 'The email field is required.' }]
+ * ```
+ */
+export function parseApiErrors(
+  apiError: unknown,
+  preset?: ErrorPreset | ErrorPreset[],
+): ApiFieldError[] {
+  const presets = preset
+    ? (Array.isArray(preset) ? preset : [preset])
+    : [classValidatorPreset()];
+
+  for (const p of presets) {
+    const result = p.parse(apiError);
+    if (result.length > 0) return result;
+  }
+  return [];
+}
+
+/**
+ * Wrap an Observable with form submit lifecycle management.
+ *
+ * Standalone version of `FormBridge.handleSubmit()`. Useful when you want
+ * submit state management without a full FormBridge instance.
+ *
+ * - Disables the form before subscribing
+ * - Re-enables the form on success or error
+ * - Returns the original Observable (errors are re-thrown)
+ *
+ * @param form - The FormGroup to manage
+ * @param source - The Observable to wrap (e.g. HttpClient call)
+ * @param options.onError - Callback invoked with the error before re-throwing
+ * @returns The wrapped Observable
+ *
+ * @example
+ * ```typescript
+ * import { wrapSubmit } from 'ngx-api-forms';
+ *
+ * wrapSubmit(this.form, this.http.post('/api', data), {
+ *   onError: (err) => this.bridge.applyApiErrors(err.error),
+ * }).subscribe();
+ * ```
+ */
+export function wrapSubmit<T>(
+  form: FormGroup,
+  source: Observable<T>,
+  options?: { onError?: (err: unknown) => void },
+): Observable<T> {
+  form.disable();
+  return source.pipe(
+    tap(() => form.enable()),
+    catchError((err) => {
+      form.enable();
+      options?.onError?.(err);
+      throw err;
+    }),
+  );
+}
 
 /**
  * Convert a plain object to FormData.

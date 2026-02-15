@@ -31,6 +31,8 @@ export { NgxFormErrorDirective } from './lib/directives/form-error.directive';
 
 // Utility functions (tree-shakeable)
 export {
+  parseApiErrors,
+  wrapSubmit,
   toFormData,
   enableForm,
   disableForm,

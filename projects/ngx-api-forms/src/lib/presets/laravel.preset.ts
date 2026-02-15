@@ -14,6 +14,15 @@
  */
 import { ApiFieldError, ErrorPreset, LaravelValidationErrors } from '../models/api-forms.models';
 
+/**
+ * Infers a constraint key from a Laravel validation message.
+ *
+ * @remarks
+ * This function relies on English-language pattern matching (e.g. "is required",
+ * "must be a valid email"). If your Laravel backend returns translated messages,
+ * the inference will fall back to 'invalid'. In that case, use a `constraintMap`
+ * in your FormBridgeConfig or write a custom preset.
+ */
 function inferConstraint(message: string): string {
   const lower = message.toLowerCase();
 

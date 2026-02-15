@@ -1,4 +1,5 @@
 import { FormBuilder, FormGroup } from '@angular/forms';
+import { of, throwError } from 'rxjs';
 import {
   toFormData,
   enableForm,
@@ -7,7 +8,12 @@ import {
   getDirtyValues,
   hasError,
   getErrorMessage,
+  parseApiErrors,
+  wrapSubmit,
 } from './form-utils';
+import { laravelPreset } from '../presets/laravel.preset';
+import { zodPreset } from '../presets/zod.preset';
+import { classValidatorPreset } from '../presets/class-validator.preset';
 
 describe('Form Utilities', () => {
   let fb: FormBuilder;
@@ -134,6 +140,95 @@ describe('Form Utilities', () => {
 
     it('should return null for no errors', () => {
       expect(getErrorMessage(form, 'email')).toBeNull();
+    });
+  });
+
+  describe('parseApiErrors', () => {
+    it('should parse class-validator errors by default', () => {
+      const apiError = {
+        statusCode: 400,
+        message: [
+          { property: 'email', constraints: { isEmail: 'email must be a valid email' } },
+        ],
+      };
+
+      const result = parseApiErrors(apiError);
+      expect(result.length).toBe(1);
+      expect(result[0].field).toBe('email');
+      expect(result[0].constraint).toBe('isEmail');
+    });
+
+    it('should accept a single preset', () => {
+      const apiError = {
+        message: 'The given data was invalid.',
+        errors: {
+          email: ['The email field is required.'],
+        },
+      };
+
+      const result = parseApiErrors(apiError, laravelPreset());
+      expect(result.length).toBe(1);
+      expect(result[0].field).toBe('email');
+      expect(result[0].constraint).toBe('required');
+    });
+
+    it('should try multiple presets in order', () => {
+      const zodError = {
+        fieldErrors: {
+          name: ['String must contain at least 3 character(s)'],
+        },
+      };
+
+      // Laravel won't match, Zod will
+      const result = parseApiErrors(zodError, [laravelPreset(), zodPreset()]);
+      expect(result.length).toBe(1);
+      expect(result[0].field).toBe('name');
+      expect(result[0].constraint).toBe('minlength');
+    });
+
+    it('should return empty array for unrecognized payloads', () => {
+      expect(parseApiErrors('random string')).toEqual([]);
+      expect(parseApiErrors(null)).toEqual([]);
+      expect(parseApiErrors(42)).toEqual([]);
+    });
+  });
+
+  describe('wrapSubmit', () => {
+    it('should disable form then re-enable on success', (done) => {
+      wrapSubmit(form, of('ok')).subscribe({
+        next: (val) => {
+          expect(val).toBe('ok');
+          expect(form.enabled).toBeTrue();
+          done();
+        },
+      });
+
+      // Form should have been disabled synchronously but by the time
+      // subscribe fires the tap has re-enabled it
+    });
+
+    it('should re-enable form on error', (done) => {
+      wrapSubmit(form, throwError(() => new Error('fail'))).subscribe({
+        error: (err) => {
+          expect(err.message).toBe('fail');
+          expect(form.enabled).toBeTrue();
+          done();
+        },
+      });
+    });
+
+    it('should call onError callback', (done) => {
+      const spy = jasmine.createSpy('onError');
+
+      wrapSubmit(form, throwError(() => new Error('fail')), {
+        onError: spy,
+      }).subscribe({
+        error: () => {
+          expect(spy).toHaveBeenCalledTimes(1);
+          expect(spy.calls.first().args[0].message).toBe('fail');
+          done();
+        },
+      });
     });
   });
 });

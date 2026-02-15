@@ -57,8 +57,8 @@ const PRESET_CONSTRAINT_MAPS: Record<string, ConstraintMap> = {
  * readonly firstError = bridge.firstErrorSignal;
  * ```
  */
-export class FormBridge {
-  private readonly _form: FormGroup;
+export class FormBridge<T extends FormGroup = FormGroup> {
+  private readonly _form: T;
   private readonly _presets: ErrorPreset[];
   private readonly _constraintMap: ConstraintMap;
   private readonly _i18n: I18nConfig | undefined;
@@ -97,7 +97,7 @@ export class FormBridge {
   /** Whether a submit operation is in progress */
   readonly isSubmittingSignal: Signal<boolean> = this._isSubmitting.asReadonly();
 
-  constructor(form: FormGroup, config?: FormBridgeConfig) {
+  constructor(form: T, config?: FormBridgeConfig) {
     this._form = form;
     this._catchAll = config?.catchAll ?? false;
     this._mergeErrors = config?.mergeErrors ?? false;
@@ -343,7 +343,7 @@ export class FormBridge {
   /**
    * Access the underlying FormGroup.
    */
-  get form(): FormGroup {
+  get form(): T {
     return this._form;
   }
 
@@ -480,6 +480,6 @@ export class FormBridge {
  * bridge.applyApiErrors(err.error);
  * ```
  */
-export function createFormBridge(form: FormGroup, config?: FormBridgeConfig): FormBridge {
+export function createFormBridge<T extends FormGroup = FormGroup>(form: T, config?: FormBridgeConfig): FormBridge<T> {
   return new FormBridge(form, config);
 }

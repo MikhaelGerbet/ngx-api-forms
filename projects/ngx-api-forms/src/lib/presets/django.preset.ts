@@ -19,6 +19,15 @@
  */
 import { ApiFieldError, DjangoValidationErrors, ErrorPreset } from '../models/api-forms.models';
 
+/**
+ * Infers a constraint key from a Django REST Framework validation message.
+ *
+ * @remarks
+ * This function relies on English-language pattern matching (e.g. "this field is required",
+ * "valid email"). If your Django backend returns translated messages (USE_I18N=True with
+ * non-English locale), the inference will fall back to 'invalid'. In that case, use a
+ * `constraintMap` in your FormBridgeConfig or write a custom preset.
+ */
 function inferConstraint(message: string): string {
   const lower = message.toLowerCase();
 
