@@ -18,6 +18,25 @@
       "problemMatcher": "$tsc"
     },
     {
+      "label": "demo",
+      "type": "shell",
+      "command": "npm run dev",
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "typescript",
+        "pattern": "$tsc",
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": {
+            "regexp": "(.*?)"
+          },
+          "endsPattern": {
+            "regexp": "bundle generation complete"
+          }
+        }
+      }
+    },
+    {
       "label": "build:lib:watch",
       "type": "shell",
       "command": "ng build ngx-api-forms --watch",
