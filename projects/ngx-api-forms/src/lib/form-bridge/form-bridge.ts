@@ -264,17 +264,23 @@ export class FormBridge<T extends FormGroup = FormGroup> {
 
       const finalErrorKey = errorKey || 'generic';
 
-      // Accumulate: merge with already-pending errors for this control
+      // Deduplicate: if the same key already exists on this control, suffix it
       const existing = pendingErrors.get(control) ?? (this._mergeErrors ? (control.errors ?? {}) : {});
-      pendingErrors.set(control, { ...existing, [finalErrorKey]: message });
+      let uniqueKey = finalErrorKey;
+      if (existing[uniqueKey] !== undefined) {
+        let idx = 1;
+        while (existing[`${finalErrorKey}_${idx}`] !== undefined) idx++;
+        uniqueKey = `${finalErrorKey}_${idx}`;
+      }
+      pendingErrors.set(control, { ...existing, [uniqueKey]: message });
 
       // Track this key as API-set
       if (!this._apiErrorKeys.has(control)) {
         this._apiErrorKeys.set(control, new Set());
       }
-      this._apiErrorKeys.get(control)!.add(finalErrorKey);
+      this._apiErrorKeys.get(control)!.add(uniqueKey);
 
-      resolved.push({ field: fieldError.field, errorKey: finalErrorKey, message });
+      resolved.push({ field: fieldError.field, errorKey: uniqueKey, message });
     }
 
     // Apply accumulated errors once per control
@@ -348,7 +354,9 @@ export class FormBridge<T extends FormGroup = FormGroup> {
  * bridge.applyApiErrors(err.error);
  * ```
  */
-export function createFormBridge<T extends FormGroup = FormGroup>(form: T, config?: FormBridgeConfig): FormBridge<T> {
+export function createFormBridge<T extends FormGroup>(form: T, config: FormBridgeConfig): FormBridge<T>;
+export function createFormBridge<T extends FormGroup>(form: T): FormBridge<T>;
+export function createFormBridge<T extends FormGroup>(form: T, config?: FormBridgeConfig): FormBridge<T> {
   return new FormBridge(form, config);
 }
 
@@ -375,6 +383,8 @@ export function createFormBridge<T extends FormGroup = FormGroup>(form: T, confi
  * }
  * ```
  */
-export function provideFormBridge<T extends FormGroup = FormGroup>(form: T, config?: FormBridgeConfig): FormBridge<T> {
+export function provideFormBridge<T extends FormGroup>(form: T, config: FormBridgeConfig): FormBridge<T>;
+export function provideFormBridge<T extends FormGroup>(form: T): FormBridge<T>;
+export function provideFormBridge<T extends FormGroup>(form: T, config?: FormBridgeConfig): FormBridge<T> {
   return new FormBridge(form, config);
 }

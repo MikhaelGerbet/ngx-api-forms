@@ -45,7 +45,7 @@ function inferConstraint(message: string): string {
   if (lower.includes('valid phone')) return 'phone';
   if (lower.includes('does not match')) return 'pattern';
 
-  return 'invalid';
+  return 'serverError';
 }
 
 /**

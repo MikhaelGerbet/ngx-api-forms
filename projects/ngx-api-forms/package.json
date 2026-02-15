@@ -18,7 +18,12 @@
     "ssr",
     "zod",
     "laravel",
-    "django"
+    "django",
+    "angular-validation-errors",
+    "422",
+    "server-side-validation",
+    "form-errors",
+    "http-interceptor"
   ],
   "author": {
     "name": "Mikhaël GERBET",

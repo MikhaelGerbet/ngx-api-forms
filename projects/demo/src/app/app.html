@@ -72,8 +72,12 @@ this.http.post('/api', data).subscribe(&#123;
           <p>NestJS, Laravel, Django REST, Zod. Same API, different backends. One line to switch.</p>
         </div>
         <div class="why-card">
+          <h3>Built-in HttpInterceptor</h3>
+          <p><code>apiErrorInterceptor()</code> + <code>withFormBridge(bridge)</code> = zero error handling code in <code>subscribe()</code>.</p>
+        </div>
+        <div class="why-card">
           <h3>Standalone Parsing</h3>
-          <p><code>parseApiErrors()</code> works without a form. Use it in HttpInterceptors, NgRx effects, or services.</p>
+          <p><code>parseApiErrors()</code> works without a form. Use it in custom interceptors, NgRx effects, or services.</p>
         </div>
         <div class="why-card">
           <h3>Native Signals</h3>
@@ -519,23 +523,41 @@ const dispose = bridge.addInterceptor((errors) =&gt;
         <h3>Implementation</h3>
         <div class="code-block">
           <div class="code-header">
-            <span>interceptor.ts</span>
-            <button class="copy-btn" (click)="copyToClipboard('import { HttpInterceptorFn } from \'@angular/common/http\';\nimport { parseApiErrors, classValidatorPreset } from \'ngx-api-forms\';\n\nexport const apiErrorInterceptor: HttpInterceptorFn = (req, next) => {\n  return next(req).pipe(\n    catchError((err) => {\n      if (err.status === 422) {\n        const errors = parseApiErrors(err.error, classValidatorPreset());\n        errorStore.setFieldErrors(errors);\n      }\n      return throwError(() => err);\n    }),\n  );\n};')">Copy</button>
+            <span>app.config.ts</span>
+            <button class="copy-btn" (click)="copyToClipboard('import { provideHttpClient, withInterceptors } from \'@angular/common/http\';\nimport { apiErrorInterceptor } from \'ngx-api-forms\';\n\nexport const appConfig = {\n  providers: [\n    provideHttpClient(\n      withInterceptors([apiErrorInterceptor()])\n    ),\n  ],\n};')">Copy</button>
           </div>
-          <pre><code>import &#123; HttpInterceptorFn &#125; from '&#64;angular/common/http';
-import &#123; parseApiErrors, classValidatorPreset &#125; from 'ngx-api-forms';
+          <pre><code>// Setup: register the interceptor once
+import &#123; provideHttpClient, withInterceptors &#125; from '&#64;angular/common/http';
+import &#123; apiErrorInterceptor &#125; from 'ngx-api-forms';
 
-export const apiErrorInterceptor: HttpInterceptorFn = (req, next) =&gt; &#123;
-  return next(req).pipe(
-    catchError((err) =&gt; &#123;
-      if (err.status === 422) &#123;
-        const errors = parseApiErrors(err.error, classValidatorPreset());
-        errorStore.setFieldErrors(errors);
-      &#125;
-      return throwError(() =&gt; err);
-    &#125;),
-  );
+export const appConfig = &#123;
+  providers: [
+    provideHttpClient(
+      withInterceptors([apiErrorInterceptor()])
+    ),
+  ],
 &#125;;</code></pre>
+        </div>
+        <div class="code-block">
+          <div class="code-header">
+            <span>component.ts</span>
+            <button class="copy-btn" (click)="copyToClipboard('import { withFormBridge } from \'ngx-api-forms\';\n\n// Zero error handling code -- errors applied automatically\nthis.http.post(\'/api/save\', data, withFormBridge(this.bridge)).subscribe({\n  next: () => this.router.navigate([\'/done\']),\n});')">Copy</button>
+          </div>
+          <pre><code>import &#123; withFormBridge &#125; from 'ngx-api-forms';
+
+// Zero error handling code -- errors applied automatically
+this.http.post('/api/save', data, withFormBridge(this.bridge)).subscribe(&#123;
+  next: () =&gt; this.router.navigate(['/done']),
+&#125;);</code></pre>
+        </div>
+        <div class="code-block">
+          <div class="code-header">
+            <span>standalone: parseApiErrors</span>
+            <button class="copy-btn" (click)="copyToClipboard('// Or use parseApiErrors() directly in your own interceptor\nconst errors = parseApiErrors(err.error, classValidatorPreset());\nerrorStore.setFieldErrors(errors);')">Copy</button>
+          </div>
+          <pre><code>// Or use parseApiErrors() directly in your own interceptor
+const errors = parseApiErrors(err.error, classValidatorPreset());
+errorStore.setFieldErrors(errors);</code></pre>
         </div>
       </div>
     </section>
@@ -733,6 +755,20 @@ export class MyComponent &#123;
             <tr><td><code>laravelPreset()</code></td><td>Laravel</td><td><code>&#123; errors: &#123; field: [msgs] &#125; &#125;</code></td></tr>
             <tr><td><code>djangoPreset()</code></td><td>Django REST</td><td><code>&#123; field: [msgs] &#125;</code></td></tr>
             <tr><td><code>zodPreset()</code></td><td>Zod</td><td><code>&#123; fieldErrors: &#123;...&#125; &#125;</code> or <code>&#123; issues: [...] &#125;</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>HttpInterceptor</h3>
+      <div class="api-table-wrapper">
+        <table class="api-table">
+          <thead>
+            <tr><th>Export</th><th>Description</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>apiErrorInterceptor(config?)</code></td><td>Functional interceptor. Catches 422/400 and auto-applies errors to tagged bridges.</td></tr>
+            <tr><td><code>withFormBridge(bridge)</code></td><td>Attach a FormBridge to an HTTP request via HttpContext.</td></tr>
+            <tr><td><code>FORM_BRIDGE</code></td><td>The HttpContextToken used internally (advanced).</td></tr>
           </tbody>
         </table>
       </div>

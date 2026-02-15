@@ -647,9 +647,9 @@ describe('FormBridge', () => {
         },
       });
       expect(result.length).toBe(2);
-      // Zod infers: 'email' in message -> email, 'Too short' -> invalid
+      // Zod infers: 'email' in message -> email, 'Too short' -> serverError (no pattern match)
       expect(form.controls['email'].hasError('email')).toBeTrue();
-      expect(form.controls['name'].hasError('invalid')).toBeTrue();
+      expect(form.controls['name'].hasError('serverError')).toBeTrue();
     });
   });
 

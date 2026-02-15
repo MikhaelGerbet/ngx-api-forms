@@ -50,7 +50,7 @@ function inferConstraintFromMessage(message: string): string {
   if (lower.includes('at most') || lower.includes('too_big') || lower.includes('must contain at most')) return 'maxlength';
   if (lower.includes('greater than or equal')) return 'min';
   if (lower.includes('less than or equal')) return 'max';
-  return 'invalid';
+  return 'serverError';
 }
 
 function zodCodeToConstraint(issue: ZodIssue): string {
@@ -60,7 +60,7 @@ function zodCodeToConstraint(issue: ZodIssue): string {
     case 'too_big':
       return issue.maximum !== undefined ? 'maxlength' : 'max';
     case 'invalid_string':
-      return issue.validation ?? 'invalid';
+      return issue.validation ?? 'serverError';
     case 'invalid_type':
       return 'required';
     case 'invalid_enum_value':
@@ -70,7 +70,7 @@ function zodCodeToConstraint(issue: ZodIssue): string {
     case 'custom':
       return 'custom';
     default:
-      return 'invalid';
+      return issue.code || 'serverError';
   }
 }
 

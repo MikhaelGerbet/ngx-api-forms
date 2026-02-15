@@ -17,6 +17,14 @@ export { zodPreset } from './lib/presets/zod.preset';
 // Directives
 export { NgxFormErrorDirective } from './lib/directives/form-error.directive';
 
+// Interceptor
+export {
+  apiErrorInterceptor,
+  withFormBridge,
+  FORM_BRIDGE,
+} from './lib/interceptor/api-error.interceptor';
+export type { ApiErrorInterceptorConfig } from './lib/interceptor/api-error.interceptor';
+
 // Utility functions (tree-shakeable)
 export {
   parseApiErrors,

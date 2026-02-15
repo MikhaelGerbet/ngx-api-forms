@@ -45,7 +45,7 @@ function inferConstraint(message: string): string {
   if (lower.includes('must be a file')) return 'file';
   if (lower.includes('must be an image')) return 'image';
 
-  return 'invalid';
+  return 'serverError';
 }
 
 /**

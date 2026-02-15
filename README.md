@@ -51,6 +51,17 @@ Switch backends by changing the preset. Constraint keys (`required`, `email`, `m
 
 **ngx-api-forms fills the gap between the API and Reactive Forms.**
 
+## When NOT to Use This
+
+This library is not a universal error handler. It only helps when your API returns **structured, field-level validation errors** (e.g. `{ email: ["required"] }`). If your backend returns flat messages like `{ message: "Bad request" }` or `{ error: "Something went wrong" }` with no per-field breakdown, ngx-api-forms cannot map anything to form controls.
+
+In practice, this rules out:
+- APIs that only return a single error string for the whole request
+- APIs returning generic 500 errors
+- Errors not tied to a specific form field (use a toast or banner instead)
+
+If you're unsure whether your backend is compatible, call `parseApiErrors(err.error, yourPreset())` in a test and check the output. If it returns an empty array, the format is not supported and you either need a custom preset or this library is not the right tool.
+
 ## Quick Start
 
 ### Minimal: parse errors without a form
@@ -161,33 +172,36 @@ Available presets: `laravel`, `django`, `class-validator`, `zod`.
 }
 ```
 
-## Constraint Inference Limitations
+## Constraint Inference
 
-The Laravel, Django, and Zod presets infer constraint types (e.g. "required", "email") by pattern-matching on the English text of error messages. This works reliably with default backend messages but has known limitations:
+The Laravel, Django, and Zod presets infer constraint types (e.g. "required", "email") by pattern-matching on the English text of error messages. This works reliably with default backend messages.
 
-- **Translated messages**: If your backend returns messages in a non-English language, inference falls back to `'invalid'` for most constraints.
-- **Custom messages**: Overridden validation messages (e.g. `'Please provide your email'` instead of `'The email field is required'`) may not match the inference patterns.
+When a message does not match any pattern, the constraint falls back to `'serverError'` with the original message preserved as the error value. This means unrecognized messages are never lost -- they still appear on the form control.
+
+Known limitations:
+
+- **Translated messages**: Non-English messages fall back to `'serverError'` for most constraints.
+- **Custom messages**: Overridden validation messages may not match the built-in patterns.
 - **NestJS/class-validator does not have this limitation** because it transmits the constraint key directly (e.g. `isEmail`, `isNotEmpty`).
 
-When inference fails, you have four options:
+When inference is not enough:
 
 ```typescript
-// 1. Disable inference entirely -- raw messages, no guessing
-const bridge = provideFormBridge(form, {
-  preset: laravelPreset({ noInference: true }),
-});
-// All errors get constraint: 'serverError' with the raw message preserved
-
-// 2. Custom constraintMap to override specific mappings
+// 1. Custom constraintMap to override specific mappings
 const bridge = provideFormBridge(form, {
   preset: laravelPreset(),
   constraintMap: { 'mon_erreur_custom': 'required' },
 });
 
-// 3. catchAll to apply unmatched errors as { generic: msg }
+// 2. catchAll to apply unmatched errors as { generic: msg }
 const bridge = provideFormBridge(form, {
   preset: laravelPreset(),
   catchAll: true,
+});
+
+// 3. Disable inference entirely -- all errors get constraint 'serverError'
+const bridge = provideFormBridge(form, {
+  preset: laravelPreset({ noInference: true }),
 });
 
 // 4. Write a custom preset for full control (see below)
@@ -215,32 +229,77 @@ const bridge = provideFormBridge(form, {
 });
 ```
 
-## Global Error Handling with HttpInterceptor
+## Automatic Error Handling with HttpInterceptor
 
-`parseApiErrors` integrates with Angular's functional interceptors to centralize error extraction for the entire app:
+The library ships a ready-to-use `apiErrorInterceptor` that catches 422/400 responses and applies errors to the right FormBridge automatically. Zero error handling code in `subscribe()`.
+
+### Setup
+
+```typescript
+// app.config.ts
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
+import { apiErrorInterceptor } from 'ngx-api-forms';
+
+export const appConfig = {
+  providers: [
+    provideHttpClient(
+      withInterceptors([apiErrorInterceptor()])
+    ),
+  ],
+};
+```
+
+### Per-request: tag with `withFormBridge()`
+
+```typescript
+import { withFormBridge } from 'ngx-api-forms';
+
+// Errors are applied to the bridge automatically -- no error handler needed
+this.http.post('/api/save', data, withFormBridge(this.bridge)).subscribe({
+  next: () => this.router.navigate(['/done']),
+});
+```
+
+### Global: centralize with `onError`
+
+```typescript
+// Catch all 422 errors, whether or not a FormBridge is attached
+apiErrorInterceptor({
+  preset: classValidatorPreset(),
+  onError: (errors, response) => {
+    this.errorStore.setFieldErrors(errors);
+    this.toastService.show(`${errors.length} validation error(s)`);
+  },
+})
+```
+
+### Custom status codes
+
+```typescript
+apiErrorInterceptor({ statusCodes: [422] }) // only 422, not 400
+```
+
+### Standalone: `parseApiErrors` in your own interceptor
+
+If you prefer full control, use `parseApiErrors` directly in a custom `HttpInterceptorFn`:
 
 ```typescript
 import { HttpInterceptorFn, HttpErrorResponse } from '@angular/common/http';
-import { inject } from '@angular/core';
 import { catchError, throwError } from 'rxjs';
 import { parseApiErrors, classValidatorPreset } from 'ngx-api-forms';
 
-export const apiErrorInterceptor: HttpInterceptorFn = (req, next) => {
-  const errorStore = inject(ErrorStore); // your error store/service
-
+export const myInterceptor: HttpInterceptorFn = (req, next) => {
   return next(req).pipe(
     catchError((err: HttpErrorResponse) => {
-      if (err.status === 422 || err.status === 400) {
+      if (err.status === 422) {
         const fieldErrors = parseApiErrors(err.error, classValidatorPreset());
-        errorStore.setFieldErrors(fieldErrors);
+        // route to your store, service, or whatever you need
       }
       return throwError(() => err);
     }),
   );
 };
 ```
-
-Components can then read from the error store, or still use `bridge.applyApiErrors()` for form-specific handling.
 
 ## Typed Forms
 
@@ -261,11 +320,24 @@ bridge.form.controls.email; // FormControl<string> -- full autocompletion
 
 ## API Reference
 
-### Core Function
+### `parseApiErrors(error, preset?, options?)`
 
-| Function | Description |
-|----------|-------------|
-| `parseApiErrors(error, preset?, options?)` | Parse API errors without a form. Works in interceptors, stores, effects. Pass `{ debug: true }` to log warnings when no preset matches. |
+Parse API errors without a form. Works in interceptors, stores, effects, tests -- anywhere. Returns `ApiFieldError[]`.
+
+```typescript
+import { parseApiErrors, laravelPreset } from 'ngx-api-forms';
+
+const errors = parseApiErrors(err.error, laravelPreset());
+// [{ field: 'email', constraint: 'required', message: 'The email field is required.' }]
+```
+
+### HttpInterceptor
+
+| Export | Description |
+|--------|-------------|
+| `apiErrorInterceptor(config?)` | Functional interceptor. Catches 422/400 and auto-applies errors to tagged bridges |
+| `withFormBridge(bridge)` | Attach a FormBridge to an HTTP request via HttpContext |
+| `FORM_BRIDGE` | The `HttpContextToken` used internally (advanced) |
 
 ### FormBridge (form integration)
 
@@ -305,14 +377,13 @@ Create with `provideFormBridge(form, config?)` or `createFormBridge(form, config
 All built-in presets accept a `noInference` option:
 
 ```typescript
-// Skip constraint guessing -- use raw messages directly
 laravelPreset({ noInference: true })
 djangoPreset({ noInference: true })
 zodPreset({ noInference: true })
 classValidatorPreset({ noInference: true })  // only affects string message fallback
 ```
 
-When `noInference: true`, all errors use `constraint: 'serverError'` with the original message preserved. Use this when your backend returns translated or custom messages.
+When `noInference: true`, all errors use `constraint: 'serverError'` with the original message preserved. Since the default fallback is also `'serverError'`, this flag is mainly useful when you want to prevent even successful inference from running (e.g. you handle all constraint mapping via `constraintMap` instead).
 
 ### Configuration
 
