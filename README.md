@@ -47,7 +47,7 @@ this.http.post('/api/register', data).subscribe({
 });
 ```
 
-Switch backends by changing the preset. Constraint keys (`required`, `email`, `minlength`) are mapped to standard Angular error keys automatically. Works with NestJS, Laravel, Django, Zod out of the box.
+Switch backends by changing the preset. Constraint keys (`required`, `email`, `minlength`) are mapped to standard Angular error keys automatically. Works with NestJS, Laravel, Django, Express, Zod out of the box.
 
 **ngx-api-forms fills the gap between the API and Reactive Forms.**
 
@@ -133,9 +133,10 @@ Presets are imported from secondary entry points for tree-shaking:
 import { provideFormBridge, classValidatorPreset } from 'ngx-api-forms';
 
 // Other presets - import only what you use
-import { djangoPreset } from 'ngx-api-forms/django';
-import { laravelPreset } from 'ngx-api-forms/laravel';
-import { zodPreset } from 'ngx-api-forms/zod';
+import { djangoPreset }            from 'ngx-api-forms/django';
+import { laravelPreset }           from 'ngx-api-forms/laravel';
+import { zodPreset }               from 'ngx-api-forms/zod';
+import { expressValidatorPreset }  from 'ngx-api-forms/express-validator';
 ```
 
 If your project uses `ng add`:
@@ -144,7 +145,7 @@ If your project uses `ng add`:
 ng add ngx-api-forms --preset=laravel
 ```
 
-Available presets: `laravel`, `django`, `class-validator`, `zod`.
+Available presets: `laravel`, `django`, `class-validator`, `zod`, `express-validator`.
 
 ## Supported Backend Formats
 
@@ -185,9 +186,20 @@ Available presets: `laravel`, `django`, `class-validator`, `zod`.
 }
 ```
 
+### Express / express-validator
+```json
+{
+  "errors": [
+    { "type": "field", "path": "email", "msg": "Invalid value", "location": "body" }
+  ]
+}
+```
+
+Also handles the legacy v5/v6 format (`{ param, msg }`) and direct arrays.
+
 ## Constraint Inference and i18n Limitation
 
-The Laravel, Django, and Zod presets infer constraint types (e.g. "required", "email") by pattern-matching on the English text of error messages. This works reliably with default backend messages.
+The Laravel, Django, Zod, and express-validator presets infer constraint types (e.g. "required", "email") by pattern-matching on the English text of error messages. This works reliably with default backend messages.
 
 When a message does not match any pattern, the constraint falls back to `'serverError'` with the original message preserved as the error value. This means unrecognized messages are never lost -- they still appear on the form control.
 
@@ -224,7 +236,19 @@ const bridge = provideFormBridge(form, {
   catchAll: true,
 });
 
-// 4. Write a custom preset for full control (see below)
+// 4. constraintPatterns: provide regex patterns for your language
+const bridge = provideFormBridge(form, {
+  preset: laravelPreset({
+    constraintPatterns: {
+      required: /est obligatoire/i,
+      email: /courriel.*invalide/i,
+      minlength: /au moins \d+ caract/i,
+    },
+  }),
+});
+// User patterns are checked first; unmatched messages fall through to English inference.
+
+// 5. Write a custom preset for full control (see below)
 ```
 
 ## Global Errors
@@ -257,6 +281,7 @@ Each backend has its own preset, imported from a secondary entry point. Pass an 
 import { laravelPreset } from 'ngx-api-forms/laravel';
 import { djangoPreset } from 'ngx-api-forms/django';
 import { zodPreset } from 'ngx-api-forms/zod';
+import { expressValidatorPreset } from 'ngx-api-forms/express-validator';
 import { classValidatorPreset } from 'ngx-api-forms';
 
 // Laravel
@@ -267,6 +292,9 @@ const bridge = provideFormBridge(form, { preset: djangoPreset() });
 
 // Zod (e.g. with tRPC)
 const bridge = provideFormBridge(form, { preset: zodPreset() });
+
+// Express / express-validator
+const bridge = provideFormBridge(form, { preset: expressValidatorPreset() });
 
 // Multiple presets, tried in order
 const bridge = provideFormBridge(form, {
@@ -459,16 +487,28 @@ Create with `provideFormBridge(form, config?)` or `createFormBridge(form, config
 
 ### Preset Options
 
-All built-in presets accept a `noInference` option:
+All built-in presets accept a `noInference` option. The Laravel, Django, Zod, and express-validator presets also accept `constraintPatterns` for custom i18n regex matching:
 
 ```typescript
+// Skip inference entirely
 laravelPreset({ noInference: true })
 djangoPreset({ noInference: true })
 zodPreset({ noInference: true })
+expressValidatorPreset({ noInference: true })
 classValidatorPreset({ noInference: true })  // only affects string message fallback
+
+// Provide regex patterns for non-English messages
+laravelPreset({
+  constraintPatterns: {
+    required: /est obligatoire/i,
+    email: /courriel.*invalide/i,
+  },
+})
 ```
 
-When `noInference: true`, all errors use `constraint: 'serverError'` with the original message preserved. Since the default fallback is also `'serverError'`, this flag is mainly useful when you want to prevent even successful inference from running (e.g. you handle all constraint mapping via `constraintMap` instead).
+When `noInference: true`, all errors use `constraint: 'serverError'` with the original message preserved. Since the default fallback is also `'serverError'`, this flag is mainly useful when you want to prevent even successful inference from running.
+
+`constraintPatterns` takes a `Record<string, RegExp>`. Each regex is tested against the raw error message. Matched patterns return the corresponding constraint key. Unmatched messages fall through to the default English inference. This lets non-English projects get proper constraint keys without writing a full custom preset.
 
 ### Configuration
 

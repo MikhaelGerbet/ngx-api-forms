@@ -3,33 +3,49 @@
 const schematics = require("@angular-devkit/schematics");
 const tasks = require("@angular-devkit/schematics/tasks");
 
-const PRESET_IMPORTS = {
-  laravel: "laravelPreset",
-  django: "djangoPreset",
-  "class-validator": "classValidatorPreset",
-  zod: "zodPreset",
-};
-
-const PRESET_CALLS = {
-  laravel: "laravelPreset()",
-  django: "djangoPreset()",
-  "class-validator": "classValidatorPreset()",
-  zod: "zodPreset()",
+/**
+ * Maps preset names to their import configuration.
+ * class-validator lives in the primary entry point; all others are secondary.
+ */
+const PRESET_CONFIG = {
+  "class-validator": {
+    importName: "classValidatorPreset",
+    importPath: "ngx-api-forms",
+    call: "classValidatorPreset()",
+  },
+  laravel: {
+    importName: "laravelPreset",
+    importPath: "ngx-api-forms/laravel",
+    call: "laravelPreset()",
+  },
+  django: {
+    importName: "djangoPreset",
+    importPath: "ngx-api-forms/django",
+    call: "djangoPreset()",
+  },
+  zod: {
+    importName: "zodPreset",
+    importPath: "ngx-api-forms/zod",
+    call: "zodPreset()",
+  },
+  "express-validator": {
+    importName: "expressValidatorPreset",
+    importPath: "ngx-api-forms/express-validator",
+    call: "expressValidatorPreset()",
+  },
 };
 
 function ngAdd(options) {
   return (tree, context) => {
     context.addTask(new tasks.NodePackageInstallTask());
 
-    const preset = options.preset || "laravel";
-    const importName = PRESET_IMPORTS[preset] || "classValidatorPreset";
-    const presetCall = PRESET_CALLS[preset] || "classValidatorPreset()";
+    const preset = options.preset || "class-validator";
+    const config = PRESET_CONFIG[preset] || PRESET_CONFIG["class-validator"];
 
-    const exampleContent = buildExampleContent(importName, presetCall);
+    // 1. Create example component
     const examplePath = "src/app/api-forms-example.component.ts";
-
     if (!tree.exists(examplePath)) {
-      tree.create(examplePath, exampleContent);
+      tree.create(examplePath, buildExampleContent(config));
       context.logger.info(
         "Created " + examplePath + " with " + preset + " preset."
       );
@@ -39,20 +55,40 @@ function ngAdd(options) {
       );
     }
 
+    // 2. Try to add interceptor to app.config.ts
+    const appConfigPath = "src/app/app.config.ts";
+    if (tree.exists(appConfigPath)) {
+      const content = tree.read(appConfigPath).toString("utf-8");
+      if (!content.includes("apiErrorInterceptor")) {
+        context.logger.info(
+          "\nTo enable automatic error handling, add the interceptor to your app.config.ts:\n\n" +
+          "  import { provideHttpClient, withInterceptors } from '@angular/common/http';\n" +
+          "  import { apiErrorInterceptor } from 'ngx-api-forms';\n\n" +
+          "  provideHttpClient(withInterceptors([apiErrorInterceptor()]))\n"
+        );
+      }
+    }
+
     return tree;
   };
 }
 
-function buildExampleContent(importName, presetCall) {
+function buildExampleContent(config) {
+  const presetImportLine =
+    config.importPath === "ngx-api-forms"
+      ? "import {\n" +
+        "  provideFormBridge,\n" +
+        "  " + config.importName + ",\n" +
+        "  NgxFormErrorDirective,\n" +
+        "} from 'ngx-api-forms';\n"
+      : "import { provideFormBridge, NgxFormErrorDirective } from 'ngx-api-forms';\n" +
+        "import { " + config.importName + " } from '" + config.importPath + "';\n";
+
   return (
     "import { Component, inject } from '@angular/core';\n" +
     "import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';\n" +
     "import { HttpClient } from '@angular/common/http';\n" +
-    "import {\n" +
-    "  provideFormBridge,\n" +
-    "  " + importName + ",\n" +
-    "  NgxFormErrorDirective,\n" +
-    "} from 'ngx-api-forms';\n" +
+    presetImportLine +
     "\n" +
     "@Component({\n" +
     "  selector: 'app-api-forms-example',\n" +
@@ -86,7 +122,7 @@ function buildExampleContent(importName, presetCall) {
     "  });\n" +
     "\n" +
     "  bridge = provideFormBridge(this.form, {\n" +
-    "    preset: " + presetCall + ",\n" +
+    "    preset: " + config.call + ",\n" +
     "  });\n" +
     "\n" +
     "  onSubmit() {\n" +

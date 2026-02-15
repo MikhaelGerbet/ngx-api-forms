@@ -16,6 +16,7 @@ import {
 import { laravelPreset } from 'ngx-api-forms/laravel';
 import { djangoPreset } from 'ngx-api-forms/django';
 import { zodPreset } from 'ngx-api-forms/zod';
+import { expressValidatorPreset } from 'ngx-api-forms/express-validator';
 
 @Component({
   selector: 'app-root',
@@ -179,6 +180,13 @@ export class App {
         { code: 'too_small', minimum: 18, path: ['age'], message: 'Number must be greater than or equal to 18' },
       ],
     },
+    'express-validator': {
+      errors: [
+        { type: 'field', path: 'email', msg: 'Invalid value', location: 'body' },
+        { type: 'field', path: 'name', msg: 'Must be at least 3 characters long', location: 'body' },
+        { type: 'field', path: 'age', msg: 'Must be at least 18', location: 'body' },
+      ],
+    },
   };
 
   selectedMockKey = signal<string>('class-validator');
@@ -195,6 +203,7 @@ export class App {
     if (key.startsWith('class-validator')) preset = classValidatorPreset();
     else if (key === 'laravel') preset = laravelPreset();
     else if (key === 'django') preset = djangoPreset();
+    else if (key === 'express-validator') preset = expressValidatorPreset();
     else preset = zodPreset();
 
     this.bridge = createFormBridge(this.form, { preset });
@@ -307,6 +316,7 @@ export class App {
       if (key === 'class-validator') preset = classValidatorPreset();
       else if (key === 'laravel') preset = laravelPreset();
       else if (key === 'django') preset = djangoPreset();
+      else if (key === 'express-validator') preset = expressValidatorPreset();
       else preset = zodPreset();
 
       this.customJsonBridge = createFormBridge(this.customJsonForm, { preset });
@@ -332,6 +342,7 @@ export class App {
     if (key === 'class-validator') preset = classValidatorPreset();
     else if (key === 'laravel') preset = laravelPreset();
     else if (key === 'django') preset = djangoPreset();
+    else if (key === 'express-validator') preset = expressValidatorPreset();
     else preset = zodPreset();
 
     // parseApiErrors works without any form or FormBridge

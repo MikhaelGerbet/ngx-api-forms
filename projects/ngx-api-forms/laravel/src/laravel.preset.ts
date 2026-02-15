@@ -23,6 +23,17 @@ import { ApiFieldError, ConstraintMap, ErrorPreset, LaravelValidationErrors } fr
  * the inference will fall back to 'serverError'. In that case, use a `constraintMap`
  * in your FormBridgeConfig or write a custom preset.
  */
+/**
+ * Tries user-provided constraint patterns against a message.
+ * Returns the matched constraint key or null.
+ */
+function matchUserPatterns(message: string, patterns: Record<string, RegExp>): string | null {
+  for (const [constraint, regex] of Object.entries(patterns)) {
+    if (regex.test(message)) return constraint;
+  }
+  return null;
+}
+
 function inferConstraint(message: string): string {
   const lower = message.toLowerCase();
 
@@ -79,6 +90,10 @@ export const LARAVEL_CONSTRAINT_MAP: ConstraintMap = {
  * @param options.noInference - When true, skips English-language constraint guessing.
  *   The raw error message is used directly and the constraint is set to `'serverError'`.
  *   Use this when your backend returns translated or custom messages.
+ * @param options.constraintPatterns - Custom regex patterns for constraint inference.
+ *   Keys are constraint names, values are RegExp tested against the raw message.
+ *   Checked before the built-in English patterns.
+ *   Example: `{ required: /obligatoire/i, email: /courriel.*invalide/i }`
  *
  * @example
  * ```typescript
@@ -91,8 +106,9 @@ export const LARAVEL_CONSTRAINT_MAP: ConstraintMap = {
  * const bridge = createFormBridge(form, { preset: laravelPreset({ noInference: true }) });
  * ```
  */
-export function laravelPreset(options?: { noInference?: boolean }): ErrorPreset {
+export function laravelPreset(options?: { noInference?: boolean; constraintPatterns?: Record<string, RegExp> }): ErrorPreset {
   const skipInference = options?.noInference ?? false;
+  const userPatterns = options?.constraintPatterns;
   return {
     name: 'laravel',
     constraintMap: LARAVEL_CONSTRAINT_MAP,
@@ -124,11 +140,15 @@ export function laravelPreset(options?: { noInference?: boolean }): ErrorPreset 
 
         for (const message of messages) {
           if (typeof message !== 'string') continue;
-          result.push({
-            field: normalizedField,
-            constraint: skipInference ? 'serverError' : inferConstraint(message),
-            message,
-          });
+          let constraint: string;
+          if (skipInference) {
+            constraint = 'serverError';
+          } else if (userPatterns) {
+            constraint = matchUserPatterns(message, userPatterns) ?? inferConstraint(message);
+          } else {
+            constraint = inferConstraint(message);
+          }
+          result.push({ field: normalizedField, constraint, message });
         }
       }
 

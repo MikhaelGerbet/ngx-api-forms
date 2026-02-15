@@ -1,7 +1,7 @@
 {
   "name": "ngx-api-forms",
   "version": "1.0.0",
-  "description": "Bridge API validation errors to Angular Reactive Forms. Supports NestJS/class-validator, Zod, Laravel, Django REST and custom presets.",
+  "description": "Bridge API validation errors to Angular Reactive Forms. Supports NestJS/class-validator, Zod, Laravel, Django REST, express-validator and custom presets.",
   "keywords": [
     "angular",
     "forms",
@@ -19,6 +19,8 @@
     "zod",
     "laravel",
     "django",
+    "express",
+    "express-validator",
     "angular-validation-errors",
     "422",
     "server-side-validation",

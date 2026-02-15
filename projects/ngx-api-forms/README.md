@@ -121,9 +121,10 @@ import { provideFormBridge, classValidatorPreset } from 'ngx-api-forms';
 import { laravelPreset } from 'ngx-api-forms/laravel';
 import { djangoPreset } from 'ngx-api-forms/django';
 import { zodPreset }    from 'ngx-api-forms/zod';
+import { expressValidatorPreset } from 'ngx-api-forms/express-validator';
 ```
 
-Each preset is a separate entry point. If you only use `laravelPreset`, the Django and Zod code is never included in your bundle.
+Each preset is a separate entry point. If you only use `laravelPreset`, the Django, Zod, and express-validator code is never included in your bundle.
 
 ## Supported Backend Formats
 
@@ -164,9 +165,20 @@ Each preset is a separate entry point. If you only use `laravelPreset`, the Djan
 }
 ```
 
+### Express / express-validator
+```json
+{
+  "errors": [
+    { "type": "field", "path": "email", "msg": "Invalid value", "location": "body" }
+  ]
+}
+```
+
+Also handles the legacy v5/v6 format (`{ param, msg }`) and direct arrays.
+
 ## Constraint Inference and i18n Limitation
 
-The Laravel, Django, and Zod presets infer constraint types (e.g. "required", "email") by pattern-matching on the English text of error messages. This works reliably with default backend messages.
+The Laravel, Django, Zod, and express-validator presets infer constraint types (e.g. "required", "email") by pattern-matching on the English text of error messages. This works reliably with default backend messages.
 
 When a message does not match any pattern, the constraint falls back to `'serverError'` with the original message preserved. Unrecognized messages are never lost.
 
@@ -205,7 +217,19 @@ const bridge = provideFormBridge(form, {
   catchAll: true,
 });
 
-// 4. Write a custom preset for full control (see below)
+// 4. constraintPatterns: provide regex patterns for your language
+const bridge = provideFormBridge(form, {
+  preset: laravelPreset({
+    constraintPatterns: {
+      required: /est obligatoire/i,
+      email: /courriel.*invalide/i,
+      minlength: /au moins \d+ caract/i,
+    },
+  }),
+});
+// User patterns are checked first; unmatched messages fall through to English inference.
+
+// 5. Write a custom preset for full control (see below)
 ```
 
 ## Global Errors
@@ -239,6 +263,7 @@ import { provideFormBridge, classValidatorPreset } from 'ngx-api-forms';
 import { laravelPreset } from 'ngx-api-forms/laravel';
 import { djangoPreset } from 'ngx-api-forms/django';
 import { zodPreset }    from 'ngx-api-forms/zod';
+import { expressValidatorPreset } from 'ngx-api-forms/express-validator';
 
 // Laravel
 const bridge = provideFormBridge(form, { preset: laravelPreset() });
@@ -248,6 +273,9 @@ const bridge = provideFormBridge(form, { preset: djangoPreset() });
 
 // Zod (e.g. with tRPC)
 const bridge = provideFormBridge(form, { preset: zodPreset() });
+
+// Express / express-validator
+const bridge = provideFormBridge(form, { preset: expressValidatorPreset() });
 
 // Multiple presets, tried in order
 const bridge = provideFormBridge(form, {
@@ -427,16 +455,28 @@ Create with `provideFormBridge(form, config?)` or `createFormBridge(form, config
 
 ### Preset Options
 
-All built-in presets accept a `noInference` option:
+All built-in presets accept a `noInference` option. The Laravel, Django, Zod, and express-validator presets also accept `constraintPatterns` for custom i18n regex matching:
 
 ```typescript
+// Skip inference entirely
 laravelPreset({ noInference: true })
 djangoPreset({ noInference: true })
 zodPreset({ noInference: true })
+expressValidatorPreset({ noInference: true })
 classValidatorPreset({ noInference: true })  // only affects string message fallback
+
+// Provide regex patterns for non-English messages
+laravelPreset({
+  constraintPatterns: {
+    required: /est obligatoire/i,
+    email: /courriel.*invalide/i,
+  },
+})
 ```
 
-When `noInference: true`, all errors use `constraint: 'serverError'` with the original message preserved. Since the default fallback is also `'serverError'`, this flag is mainly useful when you want to prevent even successful inference from running.
+When `noInference: true`, all errors use `constraint: 'serverError'` with the original message preserved.
+
+`constraintPatterns` takes a `Record<string, RegExp>`. Each regex is tested against the raw error message. Matched patterns return the corresponding constraint key. Unmatched messages fall through to the default English inference.
 
 ### Configuration
 

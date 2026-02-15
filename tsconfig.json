@@ -19,6 +19,9 @@
       ],
       "ngx-api-forms/zod": [
         "./projects/ngx-api-forms/zod/src/public-api"
+      ],
+      "ngx-api-forms/express-validator": [
+        "./projects/ngx-api-forms/express-validator/src/public-api"
       ]
     },
     "noFallthroughCasesInSwitch": true,

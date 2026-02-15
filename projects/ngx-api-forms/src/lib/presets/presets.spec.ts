@@ -2,6 +2,7 @@ import { classValidatorPreset } from './class-validator.preset';
 import { laravelPreset } from 'ngx-api-forms/laravel';
 import { djangoPreset } from 'ngx-api-forms/django';
 import { zodPreset } from 'ngx-api-forms/zod';
+import { expressValidatorPreset } from 'ngx-api-forms/express-validator';
 import { GLOBAL_ERROR_FIELD } from '../models/api-forms.models';
 
 describe('Error Presets', () => {
@@ -311,6 +312,233 @@ describe('Error Presets', () => {
       const global = result.filter(e => e.field === GLOBAL_ERROR_FIELD);
       expect(global.length).toBe(1);
       expect(global[0].message).toBe('Form-level error');
+    });
+  });
+
+  describe('expressValidatorPreset', () => {
+    const preset = expressValidatorPreset();
+
+    it('should have name "express-validator"', () => {
+      expect(preset.name).toBe('express-validator');
+    });
+
+    it('should parse v7 format with { errors: [...] }', () => {
+      const result = preset.parse({
+        errors: [
+          { type: 'field', path: 'email', msg: 'Invalid value', location: 'body' },
+          { type: 'field', path: 'name', msg: 'Name is required', location: 'body' },
+        ],
+      });
+
+      expect(result.length).toBe(2);
+      expect(result[0].field).toBe('email');
+      expect(result[0].constraint).toBe('invalid');
+      expect(result[0].message).toBe('Invalid value');
+      expect(result[1].field).toBe('name');
+      expect(result[1].constraint).toBe('required');
+    });
+
+    it('should parse legacy v5/v6 format with param instead of path', () => {
+      const result = preset.parse({
+        errors: [
+          { param: 'email', msg: 'Must be a valid email', location: 'body' },
+        ],
+      });
+
+      expect(result.length).toBe(1);
+      expect(result[0].field).toBe('email');
+      expect(result[0].constraint).toBe('email');
+    });
+
+    it('should parse direct array format', () => {
+      const result = preset.parse([
+        { type: 'field', path: 'email', msg: 'Invalid value' },
+        { type: 'field', path: 'name', msg: 'Name is required' },
+      ]);
+
+      expect(result.length).toBe(2);
+      expect(result[0].field).toBe('email');
+    });
+
+    it('should route _error to global errors', () => {
+      const result = preset.parse({
+        errors: [
+          { type: 'field', path: '_error', msg: 'Auth failed', location: 'body' },
+          { type: 'field', path: 'email', msg: 'Invalid value', location: 'body' },
+        ],
+      });
+
+      expect(result.length).toBe(2);
+      const global = result.filter(e => e.field === GLOBAL_ERROR_FIELD);
+      expect(global.length).toBe(1);
+      expect(global[0].message).toBe('Auth failed');
+    });
+
+    it('should infer common constraints', () => {
+      const cases: Array<[string, string]> = [
+        ['Invalid value', 'invalid'],
+        ['Email is required', 'required'],
+        ['Must be a valid email', 'email'],
+        ['Must be at least 3 characters', 'minlength'],
+        ['Must be a number', 'number'],
+        ['Must be an integer', 'integer'],
+        ['Email already exists', 'unique'],
+        ['Something custom', 'serverError'],
+      ];
+
+      for (const [msg, expected] of cases) {
+        const result = preset.parse({ errors: [{ type: 'field', path: 'x', msg }] });
+        expect(result[0].constraint).toBe(expected, `"${msg}" should map to "${expected}"`);
+      }
+    });
+
+    it('should skip alternative type errors', () => {
+      const result = preset.parse({
+        errors: [
+          { type: 'alternative', msg: 'At least one must pass' },
+          { type: 'field', path: 'email', msg: 'Invalid value', location: 'body' },
+        ],
+      });
+
+      expect(result.length).toBe(1);
+      expect(result[0].field).toBe('email');
+    });
+
+    it('should return empty for unrecognized input', () => {
+      expect(preset.parse(null)).toEqual([]);
+      expect(preset.parse(undefined)).toEqual([]);
+      expect(preset.parse(42)).toEqual([]);
+      expect(preset.parse('just a string')).toEqual([]);
+      expect(preset.parse({ message: 'NestJS style' })).toEqual([]);
+    });
+
+    it('should not match Laravel format (errors object with arrays)', () => {
+      const result = preset.parse({
+        errors: {
+          email: ['The email field is required.'],
+        },
+      });
+      expect(result.length).toBe(0);
+    });
+
+    describe('noInference', () => {
+      const noInf = expressValidatorPreset({ noInference: true });
+
+      it('should use serverError for all messages', () => {
+        const result = noInf.parse({
+          errors: [
+            { type: 'field', path: 'email', msg: 'Email is required', location: 'body' },
+          ],
+        });
+        expect(result.length).toBe(1);
+        expect(result[0].constraint).toBe('serverError');
+        expect(result[0].message).toBe('Email is required');
+      });
+    });
+  });
+
+  describe('constraintPatterns', () => {
+    it('should use custom patterns in laravelPreset', () => {
+      const preset = laravelPreset({
+        constraintPatterns: {
+          required: /est obligatoire/i,
+          email: /courriel.*invalide/i,
+        },
+      });
+
+      const result = preset.parse({
+        errors: {
+          email: ['Le champ courriel est invalide.'],
+          name: ['Le champ est obligatoire.'],
+        },
+      });
+
+      expect(result.length).toBe(2);
+      expect(result[0].constraint).toBe('email');
+      expect(result[1].constraint).toBe('required');
+    });
+
+    it('should fall through to English inference when custom patterns miss', () => {
+      const preset = laravelPreset({
+        constraintPatterns: {
+          required: /est obligatoire/i,
+        },
+      });
+
+      const result = preset.parse({
+        errors: {
+          email: ['The email field is required.'],
+        },
+      });
+
+      // Falls through to English inference
+      expect(result[0].constraint).toBe('required');
+    });
+
+    it('should use custom patterns in djangoPreset', () => {
+      const preset = djangoPreset({
+        constraintPatterns: {
+          required: /ce champ est obligatoire/i,
+        },
+      });
+
+      const result = preset.parse({
+        email: ['Ce champ est obligatoire.'],
+      });
+
+      expect(result[0].constraint).toBe('required');
+    });
+
+    it('should use custom patterns in zodPreset (flattened format)', () => {
+      const preset = zodPreset({
+        constraintPatterns: {
+          required: /obligatoire/i,
+          email: /courriel/i,
+        },
+      });
+
+      const result = preset.parse({
+        formErrors: [],
+        fieldErrors: {
+          email: ['Courriel invalide'],
+          name: ['Champ obligatoire'],
+        },
+      });
+
+      expect(result.length).toBe(2);
+      expect(result[0].constraint).toBe('email');
+      expect(result[1].constraint).toBe('required');
+    });
+
+    it('should use custom patterns in expressValidatorPreset', () => {
+      const preset = expressValidatorPreset({
+        constraintPatterns: {
+          required: /obligatoire/i,
+        },
+      });
+
+      const result = preset.parse({
+        errors: [
+          { type: 'field', path: 'name', msg: 'Ce champ est obligatoire', location: 'body' },
+        ],
+      });
+
+      expect(result[0].constraint).toBe('required');
+    });
+
+    it('should be ignored when noInference is true', () => {
+      const preset = laravelPreset({
+        noInference: true,
+        constraintPatterns: { required: /obligatoire/i },
+      });
+
+      const result = preset.parse({
+        errors: {
+          name: ['Le champ est obligatoire.'],
+        },
+      });
+
+      expect(result[0].constraint).toBe('serverError');
     });
   });
 });

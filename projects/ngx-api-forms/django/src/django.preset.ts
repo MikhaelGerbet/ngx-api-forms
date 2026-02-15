@@ -28,6 +28,17 @@ import { ApiFieldError, ConstraintMap, DjangoValidationErrors, ErrorPreset, GLOB
  * non-English locale), the inference will fall back to 'serverError'. In that case, use a
  * `constraintMap` in your FormBridgeConfig or write a custom preset.
  */
+/**
+ * Tries user-provided constraint patterns against a message.
+ * Returns the matched constraint key or null.
+ */
+function matchUserPatterns(message: string, patterns: Record<string, RegExp>): string | null {
+  for (const [constraint, regex] of Object.entries(patterns)) {
+    if (regex.test(message)) return constraint;
+  }
+  return null;
+}
+
 function inferConstraint(message: string): string {
   const lower = message.toLowerCase();
 
@@ -83,6 +94,10 @@ export const DJANGO_CONSTRAINT_MAP: ConstraintMap = {
  * @param options.noInference - When true, skips English-language constraint guessing.
  *   The raw error message is used directly and the constraint is set to `'serverError'`.
  *   Use this when your backend returns translated or custom messages.
+ * @param options.constraintPatterns - Custom regex patterns for constraint inference.
+ *   Keys are constraint names, values are RegExp tested against the raw message.
+ *   Checked before the built-in English patterns.
+ *   Example: `{ required: /ce champ est obligatoire/i, email: /adresse.*invalide/i }`
  *
  * @example
  * ```typescript
@@ -95,9 +110,10 @@ export const DJANGO_CONSTRAINT_MAP: ConstraintMap = {
  * const bridge = createFormBridge(form, { preset: djangoPreset({ noInference: true }) });
  * ```
  */
-export function djangoPreset(options?: { camelCase?: boolean; noInference?: boolean }): ErrorPreset {
+export function djangoPreset(options?: { camelCase?: boolean; noInference?: boolean; constraintPatterns?: Record<string, RegExp> }): ErrorPreset {
   const shouldCamelCase = options?.camelCase ?? true;
   const skipInference = options?.noInference ?? false;
+  const userPatterns = options?.constraintPatterns;
 
   return {
     name: 'django',
@@ -111,8 +127,6 @@ export function djangoPreset(options?: { camelCase?: boolean; noInference?: bool
       for (const [rawField, messages] of Object.entries(errors)) {
         if (!Array.isArray(messages)) continue;
 
-        // Non-field errors are emitted with the global sentinel field name
-        // so that FormBridge routes them to globalErrorsSignal.
         const isGlobal = rawField === 'non_field_errors' || rawField === 'detail';
         const field = isGlobal
           ? GLOBAL_ERROR_FIELD
@@ -120,11 +134,15 @@ export function djangoPreset(options?: { camelCase?: boolean; noInference?: bool
 
         for (const message of messages) {
           if (typeof message !== 'string') continue;
-          result.push({
-            field,
-            constraint: skipInference ? 'serverError' : inferConstraint(message),
-            message,
-          });
+          let constraint: string;
+          if (skipInference) {
+            constraint = 'serverError';
+          } else if (userPatterns) {
+            constraint = matchUserPatterns(message, userPatterns) ?? inferConstraint(message);
+          } else {
+            constraint = inferConstraint(message);
+          }
+          result.push({ field, constraint, message });
         }
       }
 

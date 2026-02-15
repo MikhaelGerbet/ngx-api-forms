@@ -41,6 +41,17 @@ interface ZodIssue {
  * If your Zod messages are customized or translated, prefer returning raw issues
  * (`ZodError.issues`) rather than the flattened format.
  */
+/**
+ * Tries user-provided constraint patterns against a message.
+ * Returns the matched constraint key or null.
+ */
+function matchUserPatterns(message: string, patterns: Record<string, RegExp>): string | null {
+  for (const [constraint, regex] of Object.entries(patterns)) {
+    if (regex.test(message)) return constraint;
+  }
+  return null;
+}
+
 function inferConstraintFromMessage(message: string): string {
   const lower = message.toLowerCase();
   if (lower.includes('required') || lower.includes('invalid_type')) return 'required';
@@ -102,6 +113,10 @@ export const ZOD_CONSTRAINT_MAP: ConstraintMap = {
  * @param options.noInference - When true, skips constraint guessing entirely.
  *   The raw error message is used directly and the constraint is set to `'serverError'`.
  *   Useful for custom or translated Zod error messages.
+ * @param options.constraintPatterns - Custom regex patterns for constraint inference.
+ *   Keys are constraint names, values are RegExp tested against the raw message.
+ *   Checked before the built-in English patterns (flattened format only;
+ *   the raw issues format uses structured `code` fields which are language-independent).
  *
  * @example
  * ```typescript
@@ -113,8 +128,18 @@ export const ZOD_CONSTRAINT_MAP: ConstraintMap = {
  * const bridge = createFormBridge(form, { preset: zodPreset({ noInference: true }) });
  * ```
  */
-export function zodPreset(options?: { noInference?: boolean }): ErrorPreset {
+export function zodPreset(options?: { noInference?: boolean; constraintPatterns?: Record<string, RegExp> }): ErrorPreset {
   const skipInference = options?.noInference ?? false;
+  const userPatterns = options?.constraintPatterns;
+
+  function inferMessage(message: string): string {
+    if (userPatterns) {
+      const match = matchUserPatterns(message, userPatterns);
+      if (match) return match;
+    }
+    return inferConstraintFromMessage(message);
+  }
+
   return {
     name: 'zod',
     constraintMap: ZOD_CONSTRAINT_MAP,
@@ -138,7 +163,7 @@ export function zodPreset(options?: { noInference?: boolean }): ErrorPreset {
           if (!Array.isArray(messages)) continue;
           for (const message of messages) {
             if (typeof message !== 'string') continue;
-            result.push({ field, constraint: skipInference ? 'serverError' : inferConstraintFromMessage(message), message });
+            result.push({ field, constraint: skipInference ? 'serverError' : inferMessage(message), message });
           }
         }
         return result;
@@ -189,7 +214,7 @@ export function zodPreset(options?: { noInference?: boolean }): ErrorPreset {
             if (!Array.isArray(messages)) continue;
             for (const message of messages) {
               if (typeof message !== 'string') continue;
-              result.push({ field, constraint: skipInference ? 'serverError' : inferConstraintFromMessage(message), message });
+              result.push({ field, constraint: skipInference ? 'serverError' : inferMessage(message), message });
             }
           }
           return result;

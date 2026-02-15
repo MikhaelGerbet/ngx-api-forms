@@ -68,8 +68,8 @@ this.http.post('/api', data).subscribe(&#123;
 
       <div class="why-grid">
         <div class="why-card">
-          <h3>4 Backend Presets</h3>
-          <p>NestJS, Laravel, Django REST, Zod. Same API, different backends. One line to switch.</p>
+          <h3>5 Backend Presets</h3>
+          <p>NestJS, Laravel, Django REST, Zod, Express. Same API, different backends. One line to switch.</p>
         </div>
         <div class="why-card">
           <h3>Built-in HttpInterceptor</h3>
@@ -131,6 +131,7 @@ this.http.post('/api', data).subscribe(&#123;
                 <option value="django">Django REST</option>
                 <option value="zod">Zod (flattened)</option>
                 <option value="zod-issues">Zod (issues)</option>
+                <option value="express-validator">Express / express-validator</option>
               </select>
             </div>
             <div class="demo-buttons">
@@ -694,6 +695,7 @@ onSubmit() &#123;
                 <option value="laravel">Laravel</option>
                 <option value="django">Django REST</option>
                 <option value="zod">Zod</option>
+                <option value="express-validator">Express / express-validator</option>
               </select>
             </div>
             <div class="demo-buttons">
@@ -778,6 +780,7 @@ errorStore.setFieldErrors(errors);</code></pre>
                 <option value="laravel">Laravel</option>
                 <option value="django">Django REST</option>
                 <option value="zod">Zod</option>
+                <option value="express-validator">Express / express-validator</option>
               </select>
             </div>
             <div class="demo-buttons">
@@ -844,6 +847,10 @@ errorStore.setFieldErrors(errors);</code></pre>
           <h4>Zod (flattened)</h4>
           <pre><code>{{mockErrors['zod'] | json}}</code></pre>
         </div>
+        <div class="payload-card">
+          <h4>Express / express-validator</h4>
+          <pre><code>{{mockErrors['express-validator'] | json}}</code></pre>
+        </div>
       </div>
     </section>
 
@@ -867,7 +874,8 @@ import &#123; provideFormBridge, classValidatorPreset &#125; from 'ngx-api-forms
 // Other presets (tree-shakeable, separate bundles)
 import &#123; djangoPreset &#125; from 'ngx-api-forms/django';
 import &#123; laravelPreset &#125; from 'ngx-api-forms/laravel';
-import &#123; zodPreset &#125; from 'ngx-api-forms/zod';</code></pre>
+import &#123; zodPreset &#125; from 'ngx-api-forms/zod';
+import &#123; expressValidatorPreset &#125; from 'ngx-api-forms/express-validator';</code></pre>
       </div>
     </section>
 
@@ -958,6 +966,7 @@ export class MyComponent &#123;
             <tr><td><code>laravelPreset()</code></td><td>Laravel</td><td><code>&#123; errors: &#123; field: [msgs] &#125; &#125;</code></td></tr>
             <tr><td><code>djangoPreset()</code></td><td>Django REST</td><td><code>&#123; field: [msgs] &#125;</code></td></tr>
             <tr><td><code>zodPreset()</code></td><td>Zod</td><td><code>&#123; fieldErrors: &#123;...&#125; &#125;</code> or <code>&#123; issues: [...] &#125;</code></td></tr>
+            <tr><td><code>expressValidatorPreset()</code></td><td>Express / express-validator</td><td><code>&#123; errors: [&#123; path, msg &#125;] &#125;</code></td></tr>
           </tbody>
         </table>
       </div>
