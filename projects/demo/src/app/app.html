@@ -287,7 +287,7 @@ onSubmit() &#123;
         <div class="code-block">
           <div class="code-header">
             <span>template.html</span>
-            <button class="copy-btn" (click)="copyToClipboard('<button [disabled]=&quot;bridge.isSubmittingSignal()&quot;>\n  @if (bridge.isSubmittingSignal()) {\n    Sending...\n  } @else {\n    Submit\n  }\n</button>')">Copy</button>
+            <button class="copy-btn" (click)="copyToClipboard('<button [disabled]=&quot;isSubmitting()&quot;>\n  @if (isSubmitting()) {\n    Sending...\n  } @else {\n    Submit\n  }\n</button>')">Copy</button>
           </div>
           <pre><code>&lt;button [disabled]="isSubmitting()"&gt;
   &#64;if (isSubmitting()) &#123;
@@ -661,7 +661,6 @@ export class MyComponent &#123;
     name: ['', Validators.minLength(3)],
   &#125;);
 
-  // Auto-cleanup via DestroyRef -- no manual destroy() needed
   bridge = provideFormBridge(this.form, &#123;
     preset: classValidatorPreset(),
   &#125;);
@@ -693,7 +692,7 @@ export class MyComponent &#123;
       <h2>API Reference</h2>
 
       <h3>FormBridge (core)</h3>
-      <p style="margin-bottom: 0.5rem; color: var(--text-secondary, #94a3b8); font-size: 0.9rem;">Create with <code>provideFormBridge(form, config?)</code> (auto-cleanup via DestroyRef) or <code>createFormBridge(form, config?)</code> (manual destroy).</p>
+      <p style="margin-bottom: 0.5rem; color: var(--text-secondary, #94a3b8); font-size: 0.9rem;">Create with <code>provideFormBridge(form, config?)</code> or <code>createFormBridge(form, config?)</code>. Both are equivalent.</p>
       <div class="api-table-wrapper">
         <table class="api-table">
           <thead>
@@ -705,7 +704,6 @@ export class MyComponent &#123;
             <tr><td><code>getFirstError()</code></td><td><code>FirstError | null</code></td><td>Get the first error across all controls</td></tr>
             <tr><td><code>getFieldErrors(field)</code></td><td><code>ValidationErrors | null</code></td><td>Get errors for a specific field</td></tr>
             <tr><td><code>addInterceptor(fn)</code></td><td><code>() =&gt; void</code></td><td>Register an error interceptor, returns a dispose function</td></tr>
-            <tr><td><code>destroy()</code></td><td><code>void</code></td><td>Clean up subscriptions (not needed with <code>provideFormBridge</code>)</td></tr>
           </tbody>
         </table>
       </div>

@@ -96,7 +96,6 @@ export class MyComponent {
     name: ['', [Validators.required, Validators.minLength(3)]],
   });
 
-  // Auto-cleanup via DestroyRef -- no manual destroy() needed
   bridge = provideFormBridge(this.form, {
     preset: classValidatorPreset(),
   });
