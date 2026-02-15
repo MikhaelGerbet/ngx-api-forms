@@ -15,7 +15,7 @@
       "type": "string",
       "description": "The backend preset to generate.",
       "default": "laravel",
-      "enum": ["laravel", "django", "express-validator", "spring"]
+      "enum": ["laravel", "django", "class-validator", "zod"]
     }
   },
   "required": []

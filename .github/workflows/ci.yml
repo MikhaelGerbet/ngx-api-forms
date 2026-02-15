@@ -32,11 +32,25 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Lint
+        run: npx ng lint ngx-api-forms
+
       - name: Run tests
         run: npm run test:ci
 
       - name: Build library
         run: npx ng build ngx-api-forms
+
+      - name: Check bundle size
+        run: |
+          MAX_SIZE_KB=48
+          FESM_FILE=$(find dist/ngx-api-forms/fesm2022 -name '*.mjs' | head -1)
+          SIZE_KB=$(( $(wc -c < "$FESM_FILE") / 1024 ))
+          echo "Bundle size: ${SIZE_KB}KB (max: ${MAX_SIZE_KB}KB)"
+          if [ "$SIZE_KB" -gt "$MAX_SIZE_KB" ]; then
+            echo "::error::Bundle size ${SIZE_KB}KB exceeds limit of ${MAX_SIZE_KB}KB"
+            exit 1
+          fi
 
       - name: Build demo for GitHub Pages
         run: npx ng build demo --configuration production --base-href /ngx-api-forms/

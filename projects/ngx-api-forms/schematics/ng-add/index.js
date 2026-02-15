@@ -6,15 +6,15 @@ const tasks = require("@angular-devkit/schematics/tasks");
 const PRESET_IMPORTS = {
   laravel: "laravelPreset",
   django: "djangoPreset",
-  "express-validator": "classValidatorPreset",
-  spring: "classValidatorPreset",
+  "class-validator": "classValidatorPreset",
+  zod: "zodPreset",
 };
 
 const PRESET_CALLS = {
   laravel: "laravelPreset()",
   django: "djangoPreset()",
-  "express-validator": "classValidatorPreset()",
-  spring: "classValidatorPreset()",
+  "class-validator": "classValidatorPreset()",
+  zod: "zodPreset()",
 };
 
 function ngAdd(options) {

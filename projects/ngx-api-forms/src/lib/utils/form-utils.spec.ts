@@ -13,7 +13,6 @@ import {
 } from './form-utils';
 import { laravelPreset } from '../presets/laravel.preset';
 import { zodPreset } from '../presets/zod.preset';
-import { classValidatorPreset } from '../presets/class-validator.preset';
 
 describe('Form Utilities', () => {
   let fb: FormBuilder;

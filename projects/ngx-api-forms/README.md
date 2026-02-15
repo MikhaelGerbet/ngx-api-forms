@@ -81,7 +81,6 @@ export class MyComponent {
     name: ['', [Validators.required, Validators.minLength(3)]],
   });
 
-  // Auto-cleanup via DestroyRef -- no manual destroy() needed
   bridge = provideFormBridge(this.form, {
     preset: classValidatorPreset(),
   });
@@ -106,7 +105,7 @@ Or with `ng add` to scaffold an example component with your backend preset:
 ng add ngx-api-forms --preset=laravel
 ```
 
-Available presets: `laravel`, `django`, `express-validator`, `spring`.
+Available presets: `laravel`, `django`, `class-validator`, `zod`.
 
 ## Supported Backend Formats
 
@@ -155,22 +154,28 @@ The Laravel, Django, and Zod presets infer constraint types (e.g. "required", "e
 - **Custom messages**: Overridden validation messages (e.g. `'Please provide your email'` instead of `'The email field is required'`) may not match the inference patterns.
 - **NestJS/class-validator does not have this limitation** because it transmits the constraint key directly (e.g. `isEmail`, `isNotEmpty`).
 
-When inference fails, you have three options:
+When inference fails, you have four options:
 
 ```typescript
-// 1. Custom constraintMap to override specific mappings
+// 1. Disable inference entirely -- raw messages, no guessing
+const bridge = provideFormBridge(form, {
+  preset: laravelPreset({ noInference: true }),
+});
+// All errors get constraint: 'serverError' with the raw message preserved
+
+// 2. Custom constraintMap to override specific mappings
 const bridge = provideFormBridge(form, {
   preset: laravelPreset(),
   constraintMap: { 'mon_erreur_custom': 'required' },
 });
 
-// 2. catchAll to apply unmatched errors as { generic: msg }
+// 3. catchAll to apply unmatched errors as { generic: msg }
 const bridge = provideFormBridge(form, {
   preset: laravelPreset(),
   catchAll: true,
 });
 
-// 3. Write a custom preset for full control (see below)
+// 4. Write a custom preset for full control (see below)
 ```
 
 ## Switching Backends
@@ -249,16 +254,15 @@ bridge.form.controls.email; // FormControl<string> -- full autocompletion
 
 ### FormBridge (form integration)
 
-Create with `provideFormBridge(form, config?)` (auto-cleanup via DestroyRef) or `createFormBridge(form, config?)` (manual `destroy()` required).
+Create with `provideFormBridge(form, config?)` or `createFormBridge(form, config?)`. Both are equivalent.
 
 | Method | Returns | Description |
 |--------|---------|-------------|
 | `applyApiErrors(error)` | `ResolvedFieldError[]` | Parse and apply API errors to form controls |
-| `clearApiErrors()` | `void` | Remove all API-set errors |
+| `clearApiErrors()` | `void` | Remove only the API-set errors (client-side validators are preserved) |
 | `getFirstError()` | `FirstError \| null` | First error across all controls |
 | `getFieldErrors(field)` | `ValidationErrors \| null` | Errors for a specific field |
 | `addInterceptor(fn)` | `() => void` | Register an error interceptor. Returns a dispose function |
-| `destroy()` | `void` | Clean up internal subscriptions (not needed with `provideFormBridge`) |
 
 ### Signals
 
@@ -281,21 +285,18 @@ Create with `provideFormBridge(form, config?)` (auto-cleanup via DestroyRef) or 
 | `hasError(form, errorKey)` | Check if any control has a specific error |
 | `getErrorMessage(form, field, key?)` | Get the error message string for a field |
 
-### Deprecated (kept for backward compatibility)
+### Preset Options
 
-These FormBridge methods are deprecated. Use the standalone functions above instead.
+All built-in presets accept a `noInference` option:
 
-| Method | Replacement |
-|--------|-------------|
-| `handleSubmit(source)` | `wrapSubmit()` |
-| `setDefaultValues(values)` | `form.reset(values)` |
-| `reset()` | `form.reset()` + `bridge.clearApiErrors()` |
-| `enable(options?)` | `enableForm()` |
-| `disable(options?)` | `disableForm()` |
-| `toFormData(values?)` | `toFormData()` |
-| `checkDirty()` | `getDirtyValues()` or `form.dirty` |
-| `isDirtySignal` | `form.dirty` or `getDirtyValues()` |
-| `isSubmittingSignal` | Local `signal()` with `wrapSubmit()` |
+```typescript
+laravelPreset({ noInference: true })
+djangoPreset({ noInference: true })
+zodPreset({ noInference: true })
+classValidatorPreset({ noInference: true })  // only affects string message fallback
+```
+
+When `noInference: true`, all errors use `constraint: 'serverError'` with the original message preserved. Use this when your backend returns translated or custom messages.
 
 ### Configuration
 

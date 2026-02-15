@@ -1,4 +1,4 @@
-import { Component, provideZonelessChangeDetection, ViewChild } from '@angular/core';
+import { Component, inject, provideZonelessChangeDetection, ViewChild } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { NgxFormErrorDirective } from './form-error.directive';
@@ -29,8 +29,10 @@ class TestHostComponent {
   @ViewChild('errorEl', { read: NgxFormErrorDirective })
   directive!: NgxFormErrorDirective;
 
-  constructor(fb: FormBuilder) {
-    this.form = fb.group({
+  private fb = inject(FormBuilder);
+
+  constructor() {
+    this.form = this.fb.group({
       email: ['', Validators.required],
       name: [''],
     });
@@ -54,8 +56,10 @@ class RebindHostComponent {
   form: FormGroup;
   controlName = 'email';
 
-  constructor(fb: FormBuilder) {
-    this.form = fb.group({
+  private fb = inject(FormBuilder);
+
+  constructor() {
+    this.form = this.fb.group({
       email: ['', Validators.required],
       name: ['', Validators.minLength(3)],
     });

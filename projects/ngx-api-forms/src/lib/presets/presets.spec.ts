@@ -67,6 +67,28 @@ describe('Error Presets', () => {
       expect(preset.parse(42)).toEqual([]);
       expect(preset.parse('just a string')).toEqual([]);
     });
+
+    describe('noInference', () => {
+      const noInf = classValidatorPreset({ noInference: true });
+
+      it('should use serverError for string message fallback', () => {
+        const result = noInf.parse({ message: 'email is required' });
+        expect(result.length).toBe(1);
+        expect(result[0].constraint).toBe('serverError');
+        expect(result[0].message).toBe('email is required');
+      });
+
+      it('should still use structured constraint keys when available', () => {
+        const result = noInf.parse({
+          statusCode: 400,
+          message: [
+            { property: 'email', constraints: { isEmail: 'email must be valid' } },
+          ],
+        });
+        expect(result.length).toBe(1);
+        expect(result[0].constraint).toBe('isEmail');
+      });
+    });
   });
 
   describe('laravelPreset', () => {
@@ -98,6 +120,24 @@ describe('Error Presets', () => {
       });
 
       expect(result[0].constraint).toBe('unique');
+    });
+
+    describe('noInference', () => {
+      const noInf = laravelPreset({ noInference: true });
+
+      it('should use serverError instead of inferred constraint', () => {
+        const result = noInf.parse({
+          errors: {
+            email: ['The email field is required.'],
+            name: ['The name must be at least 3 characters.'],
+          },
+        });
+
+        expect(result.length).toBe(2);
+        expect(result[0].constraint).toBe('serverError');
+        expect(result[0].message).toBe('The email field is required.');
+        expect(result[1].constraint).toBe('serverError');
+      });
     });
   });
 
@@ -137,6 +177,32 @@ describe('Error Presets', () => {
       });
 
       expect(result[0].field).toBe('first_name');
+    });
+
+    describe('noInference', () => {
+      const noInf = djangoPreset({ noInference: true });
+
+      it('should use serverError instead of inferred constraint', () => {
+        const result = noInf.parse({
+          email: ['This field is required.'],
+          name: ['Ensure this field has at least 3 characters.'],
+        });
+
+        expect(result.length).toBe(2);
+        expect(result[0].constraint).toBe('serverError');
+        expect(result[0].message).toBe('This field is required.');
+        expect(result[1].constraint).toBe('serverError');
+      });
+
+      it('should combine noInference with camelCase option', () => {
+        const noInfNoCamel = djangoPreset({ noInference: true, camelCase: false });
+        const result = noInfNoCamel.parse({
+          first_name: ['This field is required.'],
+        });
+
+        expect(result[0].field).toBe('first_name');
+        expect(result[0].constraint).toBe('serverError');
+      });
     });
   });
 
@@ -180,6 +246,38 @@ describe('Error Presets', () => {
       });
 
       expect(result[0].field).toBe('address.city');
+    });
+
+    describe('noInference', () => {
+      const noInf = zodPreset({ noInference: true });
+
+      it('should use serverError for flattened errors', () => {
+        const result = noInf.parse({
+          formErrors: [],
+          fieldErrors: {
+            email: ['Invalid email'],
+            name: ['Required'],
+          },
+        });
+
+        expect(result.length).toBe(2);
+        expect(result[0].constraint).toBe('serverError');
+        expect(result[0].message).toBe('Invalid email');
+        expect(result[1].constraint).toBe('serverError');
+      });
+
+      it('should use serverError for raw issues', () => {
+        const result = noInf.parse({
+          issues: [
+            { code: 'too_small', minimum: 3, path: ['name'], message: 'Too short' },
+            { code: 'invalid_string', validation: 'email', path: ['email'], message: 'Invalid email' },
+          ],
+        });
+
+        expect(result.length).toBe(2);
+        expect(result[0].constraint).toBe('serverError');
+        expect(result[1].constraint).toBe('serverError');
+      });
     });
   });
 });

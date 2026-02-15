@@ -2,9 +2,9 @@
  * Standalone utility functions for common form operations.
  * These are tree-shakeable and don't require DI.
  */
-import { FormGroup, AbstractControl } from '@angular/forms';
+import { FormGroup } from '@angular/forms';
 import { Observable, tap, catchError } from 'rxjs';
-import { ApiFieldError, ErrorPreset } from '../models/api-forms.models';
+import { ApiFieldError, ErrorPreset, EnableFormOptions, DisableFormOptions } from '../models/api-forms.models';
 import { classValidatorPreset } from '../presets/class-validator.preset';
 
 /**
@@ -55,8 +55,8 @@ export function parseApiErrors(
 /**
  * Wrap an Observable with form submit lifecycle management.
  *
- * Standalone version of `FormBridge.handleSubmit()`. Useful when you want
- * submit state management without a full FormBridge instance.
+ * Standalone submit helper. Useful when you want disable/enable lifecycle
+ * without a full FormBridge instance.
  *
  * - Disables the form before subscribing
  * - Re-enables the form on success or error
@@ -139,7 +139,7 @@ export function toFormData(data: Record<string, unknown>): FormData {
 /**
  * Enable all controls in a form, with optional exceptions.
  */
-export function enableForm(form: FormGroup, options?: { except?: string[] }): void {
+export function enableForm(form: FormGroup, options?: EnableFormOptions): void {
   for (const key of Object.keys(form.controls)) {
     if (options?.except?.includes(key)) continue;
     form.controls[key].enable();
@@ -150,7 +150,7 @@ export function enableForm(form: FormGroup, options?: { except?: string[] }): vo
 /**
  * Disable all controls in a form, with optional exceptions.
  */
-export function disableForm(form: FormGroup, options?: { except?: string[] }): void {
+export function disableForm(form: FormGroup, options?: DisableFormOptions): void {
   for (const key of Object.keys(form.controls)) {
     if (options?.except?.includes(key)) continue;
     form.controls[key].disable();

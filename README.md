@@ -120,7 +120,7 @@ Or with `ng add` to scaffold an example component with your backend preset:
 ng add ngx-api-forms --preset=laravel
 ```
 
-Available presets: `laravel`, `django`, `express-validator`, `spring`.
+Available presets: `laravel`, `django`, `class-validator`, `zod`.
 
 ## Supported Backend Formats
 

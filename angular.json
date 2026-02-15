@@ -29,6 +29,15 @@
           "options": {
             "tsConfig": "projects/ngx-api-forms/tsconfig.spec.json"
           }
+        },
+        "lint": {
+          "builder": "@angular-eslint/builder:lint",
+          "options": {
+            "lintFilePatterns": [
+              "projects/ngx-api-forms/**/*.ts",
+              "projects/ngx-api-forms/**/*.html"
+            ]
+          }
         }
       }
     },

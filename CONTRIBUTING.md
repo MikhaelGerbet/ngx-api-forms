@@ -26,7 +26,6 @@ projects/
         form-bridge/   # Core FormBridge class
         presets/        # Backend error presets
         directives/    # Angular directives
-        services/      # Injectable service
         models/        # TypeScript interfaces
         utils/         # Standalone utility functions
   demo/               # Demo application
