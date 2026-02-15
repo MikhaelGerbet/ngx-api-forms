@@ -8,7 +8,7 @@ export const appConfig: ApplicationConfig = {
     provideBrowserGlobalErrorListeners(),
     provideZonelessChangeDetection(),
     provideHttpClient(
-      withInterceptors([mockApiInterceptor, apiErrorInterceptor()])
+      withInterceptors([apiErrorInterceptor(), mockApiInterceptor])
     ),
   ]
 };
