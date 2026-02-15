@@ -10,29 +10,44 @@
 
 **[Live Demo](https://mikhaelgerbet.github.io/ngx-api-forms/)**
 
-## The Problem
+## Why?
 
-Libraries like `@ngneat/error-tailor` or `ngx-valdemort` handle the **display** side -- rendering `Validators.required` messages in templates. But when your API returns a 422, those libraries can't help. You're left writing backend-specific parsing logic by hand:
+When your API returns a 422, you write backend-specific parsing logic by hand:
 
 ```typescript
-// Brittle, repetitive, backend-specific
+// Without ngx-api-forms
 this.http.post('/api/register', data).subscribe({
   error: (err) => {
-    const messages = err.error?.message; // NestJS format
+    const messages = err.error?.message; // NestJS-specific
     if (Array.isArray(messages)) {
       for (const msg of messages) {
         const ctrl = this.form.get(msg.property);
         if (ctrl) {
-          ctrl.setErrors(msg.constraints);
+          // Constraints object is not standard Angular error format
+          const firstKey = Object.keys(msg.constraints ?? {})[0];
+          const firstMsg = msg.constraints?.[firstKey];
+          ctrl.setErrors({ [firstKey]: firstMsg });
           ctrl.markAsTouched();
         }
       }
     }
+    // Switch to Laravel? Rewrite everything above.
   }
 });
 ```
 
-Switch from NestJS to Laravel and every error handler must be rewritten. Ten forms means ten copies of the same parsing logic. Most teams flatten everything into `{ serverError: message }`, losing constraint semantics entirely.
+Ten forms means ten copies. Switch from NestJS to Laravel and every handler must be rewritten. Most teams flatten everything into `{ serverError: message }`, losing constraint semantics entirely.
+
+With ngx-api-forms, one line handles all of it:
+
+```typescript
+// With ngx-api-forms
+this.http.post('/api/register', data).subscribe({
+  error: (err) => this.bridge.applyApiErrors(err.error),
+});
+```
+
+Switch backends by changing the preset. Constraint keys (`required`, `email`, `minlength`) are mapped to standard Angular error keys automatically. Works with NestJS, Laravel, Django, Zod out of the box.
 
 **ngx-api-forms fills the gap between the API and Reactive Forms.**
 
@@ -155,22 +170,28 @@ The Laravel, Django, and Zod presets infer constraint types (e.g. "required", "e
 - **Custom messages**: Overridden validation messages (e.g. `'Please provide your email'` instead of `'The email field is required'`) may not match the inference patterns.
 - **NestJS/class-validator does not have this limitation** because it transmits the constraint key directly (e.g. `isEmail`, `isNotEmpty`).
 
-When inference fails, you have three options:
+When inference fails, you have four options:
 
 ```typescript
-// 1. Custom constraintMap to override specific mappings
+// 1. Disable inference entirely -- raw messages, no guessing
+const bridge = provideFormBridge(form, {
+  preset: laravelPreset({ noInference: true }),
+});
+// All errors get constraint: 'serverError' with the raw message preserved
+
+// 2. Custom constraintMap to override specific mappings
 const bridge = provideFormBridge(form, {
   preset: laravelPreset(),
   constraintMap: { 'mon_erreur_custom': 'required' },
 });
 
-// 2. catchAll to apply unmatched errors as { generic: msg }
+// 3. catchAll to apply unmatched errors as { generic: msg }
 const bridge = provideFormBridge(form, {
   preset: laravelPreset(),
   catchAll: true,
 });
 
-// 3. Write a custom preset for full control (see below)
+// 4. Write a custom preset for full control (see below)
 ```
 
 ## Switching Backends
@@ -249,16 +270,15 @@ bridge.form.controls.email; // FormControl<string> -- full autocompletion
 
 ### FormBridge (form integration)
 
-Create with `provideFormBridge(form, config?)` (auto-cleanup via DestroyRef) or `createFormBridge(form, config?)` (manual `destroy()` required).
+Create with `provideFormBridge(form, config?)` or `createFormBridge(form, config?)`.
 
 | Method | Returns | Description |
 |--------|---------|-------------|
 | `applyApiErrors(error)` | `ResolvedFieldError[]` | Parse and apply API errors to form controls |
-| `clearApiErrors()` | `void` | Remove all API-set errors |
+| `clearApiErrors()` | `void` | Remove only the API-set errors (client-side validators are preserved) |
 | `getFirstError()` | `FirstError \| null` | First error across all controls |
 | `getFieldErrors(field)` | `ValidationErrors \| null` | Errors for a specific field |
 | `addInterceptor(fn)` | `() => void` | Register an error interceptor. Returns a dispose function |
-| `destroy()` | `void` | Clean up internal subscriptions (not needed with `provideFormBridge`) |
 
 ### Signals
 
@@ -281,21 +301,19 @@ Create with `provideFormBridge(form, config?)` (auto-cleanup via DestroyRef) or 
 | `hasError(form, errorKey)` | Check if any control has a specific error |
 | `getErrorMessage(form, field, key?)` | Get the error message string for a field |
 
-### Deprecated (kept for backward compatibility)
+### Preset Options
 
-These FormBridge methods are deprecated. Use the standalone functions above instead.
+All built-in presets accept a `noInference` option:
 
-| Method | Replacement |
-|--------|-------------|
-| `handleSubmit(source)` | `wrapSubmit()` |
-| `setDefaultValues(values)` | `form.reset(values)` |
-| `reset()` | `form.reset()` + `bridge.clearApiErrors()` |
-| `enable(options?)` | `enableForm()` |
-| `disable(options?)` | `disableForm()` |
-| `toFormData(values?)` | `toFormData()` |
-| `checkDirty()` | `getDirtyValues()` or `form.dirty` |
-| `isDirtySignal` | `form.dirty` or `getDirtyValues()` |
-| `isSubmittingSignal` | Local `signal()` with `wrapSubmit()` |
+```typescript
+// Skip constraint guessing -- use raw messages directly
+laravelPreset({ noInference: true })
+djangoPreset({ noInference: true })
+zodPreset({ noInference: true })
+classValidatorPreset({ noInference: true })  // only affects string message fallback
+```
+
+When `noInference: true`, all errors use `constraint: 'serverError'` with the original message preserved. Use this when your backend returns translated or custom messages.
 
 ### Configuration
 

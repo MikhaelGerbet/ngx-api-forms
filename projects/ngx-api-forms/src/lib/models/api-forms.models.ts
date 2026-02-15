@@ -196,14 +196,6 @@ export interface DisableFormOptions {
   except?: string[];
 }
 
-/**
- * Options for `resetForm()`.
- */
-export interface ResetFormOptions {
-  /** Keep the current default values (skip resetting to initial) */
-  keepDefaults?: boolean;
-}
-
 // ---------------------------------------------------------------------------
 // Utility Types
 // ---------------------------------------------------------------------------

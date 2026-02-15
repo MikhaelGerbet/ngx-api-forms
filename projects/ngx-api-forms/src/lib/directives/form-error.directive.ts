@@ -19,25 +19,28 @@
  */
 import {
   Directive,
+  DestroyRef,
   ElementRef,
   Input,
   OnChanges,
-  OnDestroy,
   OnInit,
   Renderer2,
   SimpleChanges,
   inject,
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormGroup, AbstractControl } from '@angular/forms';
-import { Subscription, merge } from 'rxjs';
+import { Subject, merge, takeUntil } from 'rxjs';
 
 @Directive({
   selector: '[ngxFormError]',
   standalone: true,
 })
-export class NgxFormErrorDirective implements OnInit, OnChanges, OnDestroy {
+export class NgxFormErrorDirective implements OnInit, OnChanges {
   private readonly el = inject(ElementRef);
   private readonly renderer = inject(Renderer2);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly resubscribe$ = new Subject<void>();
 
   /** The form control name to observe */
   @Input('ngxFormError') controlName!: string;
@@ -64,8 +67,6 @@ export class NgxFormErrorDirective implements OnInit, OnChanges, OnDestroy {
    */
   @Input() showOnTouched = true;
 
-  private subscription: Subscription | null = null;
-
   ngOnInit(): void {
     this._subscribe();
   }
@@ -76,13 +77,9 @@ export class NgxFormErrorDirective implements OnInit, OnChanges, OnDestroy {
     }
   }
 
-  ngOnDestroy(): void {
-    this.subscription?.unsubscribe();
-  }
-
   private _subscribe(): void {
-    this.subscription?.unsubscribe();
-    this.subscription = null;
+    // Signal existing subscription to complete
+    this.resubscribe$.next();
 
     const control = this.form?.get(this.controlName);
     if (!control) {
@@ -90,7 +87,10 @@ export class NgxFormErrorDirective implements OnInit, OnChanges, OnDestroy {
       return;
     }
 
-    this.subscription = merge(control.statusChanges, control.valueChanges).subscribe(() => {
+    merge(control.statusChanges, control.valueChanges).pipe(
+      takeUntil(this.resubscribe$),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe(() => {
       this._updateDisplay(control);
     });
 

@@ -86,16 +86,22 @@ function parseStringMessage(message: string): ApiFieldError[] {
 /**
  * Creates a class-validator / NestJS error preset.
  *
+ * @param options.noInference - When true, skips constraint guessing for string messages.
+ *   Structured `constraints` objects (e.g. `{ isEmail: 'message' }`) are always used as-is.
+ *   Only affects the fallback string message parser.
+ *
  * @example
  * ```typescript
  * import { classValidatorPreset } from 'ngx-api-forms';
  *
- * const bridge = createFormBridge(form, {
- *   preset: classValidatorPreset()
- * });
+ * const bridge = createFormBridge(form, { preset: classValidatorPreset() });
+ *
+ * // No inference on string messages
+ * const bridge = createFormBridge(form, { preset: classValidatorPreset({ noInference: true }) });
  * ```
  */
-export function classValidatorPreset(): ErrorPreset {
+export function classValidatorPreset(options?: { noInference?: boolean }): ErrorPreset {
+  const skipInference = options?.noInference ?? false;
   return {
     name: 'class-validator',
     parse(error: unknown): ApiFieldError[] {
@@ -114,6 +120,9 @@ export function classValidatorPreset(): ErrorPreset {
 
         // It might be an array of strings (simple messages)
         if (messages.length > 0 && typeof messages[0] === 'string') {
+          if (skipInference) {
+            return (messages as string[]).map(msg => ({ field: 'unknown', constraint: 'serverError', message: msg }));
+          }
           const results: ApiFieldError[] = [];
           for (const msg of messages as string[]) {
             results.push(...parseStringMessage(msg));
@@ -124,6 +133,9 @@ export function classValidatorPreset(): ErrorPreset {
 
       // Single string message: { message: "email is required" }
       if (typeof err['message'] === 'string') {
+        if (skipInference) {
+          return [{ field: 'unknown', constraint: 'serverError', message: err['message'] as string }];
+        }
         return parseStringMessage(err['message'] as string);
       }
 
@@ -172,4 +184,5 @@ export const CLASS_VALIDATOR_CONSTRAINT_MAP: Record<string, string> = {
   unique: 'unique',
   invalid: 'invalid',
   required: 'required',
+  serverError: 'serverError',
 };

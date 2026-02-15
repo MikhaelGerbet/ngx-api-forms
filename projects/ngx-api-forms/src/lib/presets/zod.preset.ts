@@ -79,16 +79,22 @@ function zodCodeToConstraint(issue: ZodIssue): string {
  *
  * Supports both `.flatten()` and raw `.issues` formats.
  *
+ * @param options.noInference - When true, skips constraint guessing entirely.
+ *   The raw error message is used directly and the constraint is set to `'serverError'`.
+ *   Useful for custom or translated Zod error messages.
+ *
  * @example
  * ```typescript
  * import { zodPreset } from 'ngx-api-forms';
  *
- * const bridge = createFormBridge(form, {
- *   preset: zodPreset()
- * });
+ * const bridge = createFormBridge(form, { preset: zodPreset() });
+ *
+ * // No inference: raw messages, no guessing
+ * const bridge = createFormBridge(form, { preset: zodPreset({ noInference: true }) });
  * ```
  */
-export function zodPreset(): ErrorPreset {
+export function zodPreset(options?: { noInference?: boolean }): ErrorPreset {
+  const skipInference = options?.noInference ?? false;
   return {
     name: 'zod',
     parse(error: unknown): ApiFieldError[] {
@@ -102,7 +108,7 @@ export function zodPreset(): ErrorPreset {
           if (!Array.isArray(messages)) continue;
           for (const message of messages) {
             if (typeof message !== 'string') continue;
-            result.push({ field, constraint: inferConstraintFromMessage(message), message });
+            result.push({ field, constraint: skipInference ? 'serverError' : inferConstraintFromMessage(message), message });
           }
         }
         return result;
@@ -116,7 +122,7 @@ export function zodPreset(): ErrorPreset {
           .filter((issue) => issue.path && issue.path.length > 0)
           .map((issue) => ({
             field: issue.path.map(String).join('.'),
-            constraint: zodCodeToConstraint(issue),
+            constraint: skipInference ? 'serverError' : zodCodeToConstraint(issue),
             message: issue.message,
           }));
       }
@@ -129,7 +135,7 @@ export function zodPreset(): ErrorPreset {
             .filter((issue) => issue.path && issue.path.length > 0)
             .map((issue) => ({
               field: issue.path.map(String).join('.'),
-              constraint: zodCodeToConstraint(issue),
+              constraint: skipInference ? 'serverError' : zodCodeToConstraint(issue),
               message: issue.message,
             }));
         }
@@ -144,7 +150,7 @@ export function zodPreset(): ErrorPreset {
             if (!Array.isArray(messages)) continue;
             for (const message of messages) {
               if (typeof message !== 'string') continue;
-              result.push({ field, constraint: inferConstraintFromMessage(message), message });
+              result.push({ field, constraint: skipInference ? 'serverError' : inferConstraintFromMessage(message), message });
             }
           }
           return result;
@@ -173,4 +179,5 @@ export const ZOD_CONSTRAINT_MAP: Record<string, string> = {
   date: 'date',
   custom: 'custom',
   invalid: 'invalid',
+  serverError: 'serverError',
 };

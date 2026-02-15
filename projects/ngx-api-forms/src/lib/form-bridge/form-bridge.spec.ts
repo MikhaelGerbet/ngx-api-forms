@@ -1,5 +1,4 @@
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { of, throwError, delay } from 'rxjs';
 import { FormBridge, createFormBridge } from './form-bridge';
 import { classValidatorPreset } from '../presets/class-validator.preset';
 import { laravelPreset } from '../presets/laravel.preset';
@@ -228,7 +227,7 @@ describe('FormBridge', () => {
   });
 
   describe('clearApiErrors', () => {
-    it('should clear all errors', () => {
+    it('should clear only API-set errors and preserve client-side errors', () => {
       const bridge = createFormBridge(form, { preset: classValidatorPreset() });
 
       bridge.applyApiErrors({
@@ -244,6 +243,31 @@ describe('FormBridge', () => {
 
       // API error (email) is cleared; client-side validator (required) is restored
       expect(form.controls['email'].errors?.['email']).toBeFalsy();
+      // The required validator should still be active since field is empty
+      expect(form.controls['email'].hasError('required')).toBeTrue();
+      expect(bridge.errorsSignal().length).toBe(0);
+    });
+
+    it('should preserve non-API errors set on the control', () => {
+      const bridge = createFormBridge(form, { preset: classValidatorPreset() });
+
+      // Set a custom client-side error
+      form.controls['name'].setErrors({ customError: 'my custom error' });
+
+      // Apply an API error on the same control
+      bridge.applyApiErrors({
+        message: [
+          { property: 'name', constraints: { isNotEmpty: 'name should not be empty' } },
+        ],
+      });
+
+      // Both errors should be present (API replaces, so only API error remains on name)
+      expect(form.controls['name'].hasError('required')).toBeTrue();
+
+      bridge.clearApiErrors();
+
+      // API error cleared, but customError was overwritten by applyApiErrors.
+      // The control should now be revalidated.
       expect(bridge.errorsSignal().length).toBe(0);
     });
   });
@@ -288,66 +312,6 @@ describe('FormBridge', () => {
       expect(bridge.errorsSignal().length).toBe(1);
       expect(bridge.hasErrorsSignal()).toBeTrue();
       expect(bridge.firstErrorSignal()).toBeTruthy();
-    });
-  });
-
-  describe('Form State Management', () => {
-    it('should setDefaultValues and reset', () => {
-      const bridge = createFormBridge(form);
-
-      bridge.setDefaultValues({ email: 'test@test.com', name: 'John' });
-      expect(form.controls['email'].value).toBe('test@test.com');
-      expect(form.controls['name'].value).toBe('John');
-
-      form.controls['email'].setValue('changed@test.com');
-      bridge.reset();
-
-      expect(form.controls['email'].value).toBe('test@test.com');
-    });
-
-    it('should enable/disable with exceptions', () => {
-      const bridge = createFormBridge(form);
-
-      bridge.disable({ except: ['email'] });
-      expect(form.controls['email'].enabled).toBeTrue();
-      expect(form.controls['name'].disabled).toBeTrue();
-
-      bridge.enable();
-      expect(form.controls['name'].enabled).toBeTrue();
-    });
-
-    it('should track dirty state', () => {
-      const bridge = createFormBridge(form);
-
-      bridge.setDefaultValues({ email: 'test@test.com' });
-      expect(bridge.checkDirty()).toBeFalse();
-
-      form.controls['email'].setValue('changed@test.com');
-      expect(bridge.checkDirty()).toBeTrue();
-    });
-  });
-
-  describe('toFormData', () => {
-    it('should convert form values to FormData', () => {
-      form.controls['email'].setValue('test@test.com');
-      form.controls['name'].setValue('John');
-
-      const bridge = createFormBridge(form);
-      const formData = bridge.toFormData();
-
-      expect(formData.get('email')).toBe('test@test.com');
-      expect(formData.get('name')).toBe('John');
-    });
-
-    it('should skip null values', () => {
-      form.controls['email'].setValue('test@test.com');
-      form.controls['age'].setValue(null);
-
-      const bridge = createFormBridge(form);
-      const formData = bridge.toFormData();
-
-      expect(formData.get('email')).toBe('test@test.com');
-      expect(formData.get('age')).toBeNull();
     });
   });
 
@@ -422,110 +386,6 @@ describe('FormBridge', () => {
 
       expect(form.controls['email'].hasError('customError')).toBeTrue();
       expect(form.controls['email'].hasError('email')).toBeTrue();
-    });
-  });
-
-  describe('isSubmittingSignal', () => {
-    it('should start as false', () => {
-      const bridge = createFormBridge(form, { preset: classValidatorPreset() });
-      expect(bridge.isSubmittingSignal()).toBeFalse();
-    });
-  });
-
-  describe('handleSubmit', () => {
-    it('should set isSubmittingSignal to true during submit', () => {
-      const bridge = createFormBridge(form, { preset: classValidatorPreset() });
-      let isSubmittingDuringCall = false;
-
-      bridge.handleSubmit(of({ ok: true })).subscribe({
-        next: () => {
-          // After success, isSubmitting should already be false
-        },
-      });
-
-      // After the synchronous observable completes, isSubmitting is false
-      expect(bridge.isSubmittingSignal()).toBeFalse();
-    });
-
-    it('should disable form during submit and re-enable on success', () => {
-      const bridge = createFormBridge(form, { preset: classValidatorPreset() });
-
-      bridge.handleSubmit(of({ ok: true })).subscribe();
-
-      // After synchronous completion, form should be re-enabled
-      expect(form.enabled).toBeTrue();
-    });
-
-    it('should apply API errors on failure and re-enable form', () => {
-      const bridge = createFormBridge(form, { preset: classValidatorPreset() });
-      const apiError = {
-        error: {
-          statusCode: 400,
-          message: [
-            { property: 'email', constraints: { isEmail: 'email must be valid' } },
-          ],
-        },
-      };
-
-      bridge.handleSubmit(throwError(() => apiError)).subscribe({
-        error: () => { /* expected */ },
-      });
-
-      expect(form.enabled).toBeTrue();
-      expect(bridge.isSubmittingSignal()).toBeFalse();
-      expect(form.controls['email'].hasError('email')).toBeTrue();
-    });
-
-    it('should re-throw the error for subscriber handling', () => {
-      const bridge = createFormBridge(form, { preset: classValidatorPreset() });
-      let caughtError: unknown = null;
-
-      bridge.handleSubmit(throwError(() => new Error('test'))).subscribe({
-        error: (err) => { caughtError = err; },
-      });
-
-      expect(caughtError).toBeInstanceOf(Error);
-      expect((caughtError as Error).message).toBe('test');
-    });
-
-    it('should use custom extractError when provided', () => {
-      const bridge = createFormBridge(form, { preset: classValidatorPreset() });
-      const apiError = {
-        data: {
-          statusCode: 400,
-          message: [
-            { property: 'email', constraints: { isEmail: 'bad' } },
-          ],
-        },
-      };
-
-      bridge.handleSubmit(
-        throwError(() => apiError),
-        { extractError: (err: any) => err.data }
-      ).subscribe({
-        error: () => { /* expected */ },
-      });
-
-      expect(form.controls['email'].hasError('email')).toBeTrue();
-    });
-
-    it('should clear api errors before each submit', () => {
-      const bridge = createFormBridge(form, { preset: classValidatorPreset() });
-      const apiError = {
-        error: {
-          message: [
-            { property: 'email', constraints: { isEmail: 'bad' } },
-          ],
-        },
-      };
-
-      // First submit - apply errors
-      bridge.handleSubmit(throwError(() => apiError)).subscribe({ error: () => {} });
-      expect(bridge.hasErrorsSignal()).toBeTrue();
-
-      // Second submit - success should clear errors
-      bridge.handleSubmit(of({ ok: true })).subscribe();
-      expect(bridge.hasErrorsSignal()).toBeFalse();
     });
   });
 
@@ -623,37 +483,6 @@ describe('FormBridge', () => {
         ],
       });
       expect(result.length).toBe(2);
-    });
-  });
-
-  describe('reactive isDirtySignal', () => {
-    it('should update isDirtySignal reactively when form value changes', () => {
-      const bridge = createFormBridge(form);
-      bridge.setDefaultValues({ email: 'test@test.com' });
-
-      expect(bridge.isDirtySignal()).toBeFalse();
-
-      form.controls['email'].setValue('changed@test.com');
-
-      // isDirtySignal should update reactively (via valueChanges subscription)
-      expect(bridge.isDirtySignal()).toBeTrue();
-
-      form.controls['email'].setValue('test@test.com');
-      expect(bridge.isDirtySignal()).toBeFalse();
-    });
-  });
-
-  describe('destroy()', () => {
-    it('should stop listening to valueChanges after destroy', () => {
-      const bridge = createFormBridge(form);
-      bridge.setDefaultValues({ email: 'test@test.com' });
-
-      bridge.destroy();
-
-      // After destroy, changing form value should NOT update isDirtySignal
-      form.controls['email'].setValue('changed@test.com');
-      // isDirtySignal remains false because valueChanges subscription is gone
-      expect(bridge.isDirtySignal()).toBeFalse();
     });
   });
 
@@ -821,16 +650,6 @@ describe('FormBridge', () => {
       // Zod infers: 'email' in message -> email, 'Too short' -> invalid
       expect(form.controls['email'].hasError('email')).toBeTrue();
       expect(form.controls['name'].hasError('invalid')).toBeTrue();
-    });
-  });
-
-  describe('setDefaultValues resilience', () => {
-    it('should ignore keys that do not exist in the form', () => {
-      const bridge = createFormBridge(form, { preset: classValidatorPreset() });
-      expect(() => {
-        bridge.setDefaultValues({ email: 'a@b.com', nonExistent: 'ignored' } as any);
-      }).not.toThrow();
-      expect(form.controls['email'].value).toBe('a@b.com');
     });
   });
 

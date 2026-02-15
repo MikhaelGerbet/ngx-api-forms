@@ -59,18 +59,24 @@ function snakeToCamel(str: string): string {
  * Creates a Django REST Framework validation error preset.
  *
  * @param options.camelCase - If true, converts snake_case field names to camelCase (default: true)
+ * @param options.noInference - When true, skips English-language constraint guessing.
+ *   The raw error message is used directly and the constraint is set to `'serverError'`.
+ *   Use this when your backend returns translated or custom messages.
  *
  * @example
  * ```typescript
  * import { djangoPreset } from 'ngx-api-forms';
  *
- * const bridge = createFormBridge(form, {
- *   preset: djangoPreset()
- * });
+ * // Default: infer constraint from English messages
+ * const bridge = createFormBridge(form, { preset: djangoPreset() });
+ *
+ * // No inference: raw messages, no guessing
+ * const bridge = createFormBridge(form, { preset: djangoPreset({ noInference: true }) });
  * ```
  */
-export function djangoPreset(options?: { camelCase?: boolean }): ErrorPreset {
+export function djangoPreset(options?: { camelCase?: boolean; noInference?: boolean }): ErrorPreset {
   const shouldCamelCase = options?.camelCase ?? true;
+  const skipInference = options?.noInference ?? false;
 
   return {
     name: 'django',
@@ -92,7 +98,7 @@ export function djangoPreset(options?: { camelCase?: boolean }): ErrorPreset {
           if (typeof message !== 'string') continue;
           result.push({
             field,
-            constraint: inferConstraint(message),
+            constraint: skipInference ? 'serverError' : inferConstraint(message),
             message,
           });
         }
@@ -121,4 +127,5 @@ export const DJANGO_CONSTRAINT_MAP: Record<string, string> = {
   phone: 'phone',
   pattern: 'pattern',
   invalid: 'invalid',
+  serverError: 'serverError',
 };

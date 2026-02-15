@@ -51,16 +51,23 @@ function inferConstraint(message: string): string {
 /**
  * Creates a Laravel validation error preset.
  *
+ * @param options.noInference - When true, skips English-language constraint guessing.
+ *   The raw error message is used directly and the constraint is set to `'serverError'`.
+ *   Use this when your backend returns translated or custom messages.
+ *
  * @example
  * ```typescript
  * import { laravelPreset } from 'ngx-api-forms';
  *
- * const bridge = createFormBridge(form, {
- *   preset: laravelPreset()
- * });
+ * // Default: infer constraint from English messages
+ * const bridge = createFormBridge(form, { preset: laravelPreset() });
+ *
+ * // No inference: raw messages, no guessing
+ * const bridge = createFormBridge(form, { preset: laravelPreset({ noInference: true }) });
  * ```
  */
-export function laravelPreset(): ErrorPreset {
+export function laravelPreset(options?: { noInference?: boolean }): ErrorPreset {
+  const skipInference = options?.noInference ?? false;
   return {
     name: 'laravel',
     parse(error: unknown): ApiFieldError[] {
@@ -93,7 +100,7 @@ export function laravelPreset(): ErrorPreset {
           if (typeof message !== 'string') continue;
           result.push({
             field: normalizedField,
-            constraint: inferConstraint(message),
+            constraint: skipInference ? 'serverError' : inferConstraint(message),
             message,
           });
         }
@@ -126,4 +133,5 @@ export const LARAVEL_CONSTRAINT_MAP: Record<string, string> = {
   confirmed: 'confirmed',
   file: 'file',
   image: 'image',
+  serverError: 'serverError',
 };

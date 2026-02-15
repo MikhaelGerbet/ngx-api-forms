@@ -235,35 +235,4 @@ describe('HttpClient Integration', () => {
       jasmine.anything(),
     );
   });
-
-  // -- handleSubmit lifecycle (deprecated but still functional) ------------
-
-  it('should manage submit lifecycle with handleSubmit', (done) => {
-    const form = fb.group({ email: ['test@test.com'] });
-    const bridge = createFormBridge(form, { preset: classValidatorPreset() });
-
-    bridge.handleSubmit(
-      http.post('/api/submit', form.value),
-    ).subscribe({
-      error: () => {
-        expect(form.enabled).toBeTrue();
-        expect(bridge.isSubmittingSignal()).toBeFalse();
-        expect(bridge.hasErrorsSignal()).toBeTrue();
-        done();
-      },
-    });
-
-    expect(form.disabled).toBeTrue();
-    expect(bridge.isSubmittingSignal()).toBeTrue();
-
-    httpTesting.expectOne('/api/submit').flush(
-      {
-        statusCode: 422,
-        message: [
-          { property: 'email', constraints: { isEmail: 'email must be a valid email' } },
-        ],
-      },
-      { status: 422, statusText: 'Unprocessable Entity' },
-    );
-  });
 });

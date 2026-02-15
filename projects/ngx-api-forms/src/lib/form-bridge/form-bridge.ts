@@ -4,20 +4,15 @@
  * Bridges API validation errors to Angular Reactive Forms with:
  * - Automatic error parsing via presets (class-validator, Laravel, Django, Zod)
  * - i18n-friendly error messages
- * - Form state management (reset, enable, disable, defaults)
  * - Angular Signals support
  * - SSR-safe operations
- * - FormData conversion utilities
  */
-import { signal, computed, Signal, WritableSignal, inject, DestroyRef } from '@angular/core';
+import { signal, computed, Signal, WritableSignal } from '@angular/core';
 import { FormGroup, FormArray, ValidationErrors, AbstractControl } from '@angular/forms';
-import { Observable, Subscription, tap, catchError } from 'rxjs';
 
 import {
   ApiFieldError,
   ConstraintMap,
-  DisableFormOptions,
-  EnableFormOptions,
   ErrorInterceptor,
   ErrorPreset,
   FirstError,
@@ -25,7 +20,6 @@ import {
   I18nConfig,
   ResolvedFieldError,
 } from '../models/api-forms.models';
-import { toFormData as toFormDataUtil } from '../utils/form-utils';
 import { CLASS_VALIDATOR_CONSTRAINT_MAP, classValidatorPreset } from '../presets/class-validator.preset';
 import { LARAVEL_CONSTRAINT_MAP } from '../presets/laravel.preset';
 import { DJANGO_CONSTRAINT_MAP } from '../presets/django.preset';
@@ -65,18 +59,13 @@ export class FormBridge<T extends FormGroup = FormGroup> {
   private readonly _catchAll: boolean;
   private readonly _mergeErrors: boolean;
   private readonly _debug: boolean;
-  private readonly _defaultValues: Record<string, unknown> = {};
   private _interceptors: ErrorInterceptor[] = [];
-  private _valueChangesSub: Subscription | null = null;
 
   /** Signal containing the last set of resolved API errors */
   private readonly _apiErrors: WritableSignal<ResolvedFieldError[]> = signal([]);
 
-  /** Signal containing dirty state tracking */
-  private readonly _isDirty: WritableSignal<boolean> = signal(false);
-
-  /** Signal containing submitting state */
-  private readonly _isSubmitting: WritableSignal<boolean> = signal(false);
+  /** Tracks which error keys were set by the API on each control */
+  private _apiErrorKeys = new Map<AbstractControl, Set<string>>();
 
   // ---- Public Signals ----
 
@@ -91,23 +80,6 @@ export class FormBridge<T extends FormGroup = FormGroup> {
 
   /** Whether any API errors are currently applied */
   readonly hasErrorsSignal: Signal<boolean> = computed(() => this._apiErrors().length > 0);
-
-  /**
-   * Whether the form has been modified from its default values.
-   *
-   * @deprecated Use the standalone `getDirtyValues()` function or Angular's
-   * built-in `form.dirty` for simpler dirty tracking. This signal will be
-   * removed in a future major version.
-   */
-  readonly isDirtySignal: Signal<boolean> = this._isDirty.asReadonly();
-
-  /**
-   * Whether a submit operation is in progress.
-   *
-   * @deprecated Use `wrapSubmit()` with a local `signal()` for submit tracking.
-   * This signal is tied to the deprecated `handleSubmit()` method.
-   */
-  readonly isSubmittingSignal: Signal<boolean> = this._isSubmitting.asReadonly();
 
   constructor(form: T, config?: FormBridgeConfig) {
     this._form = form;
@@ -129,22 +101,6 @@ export class FormBridge<T extends FormGroup = FormGroup> {
       ...presetDefaults,
       ...(config?.constraintMap ?? {}),
     };
-
-    // Store initial form values as defaults
-    this._captureDefaults();
-
-    // Subscribe to valueChanges for reactive isDirtySignal
-    this._valueChangesSub = this._form.valueChanges.subscribe(() => {
-      this._computeDirty();
-    });
-  }
-
-  /**
-   * Clean up subscriptions. Call this when the FormBridge is no longer needed.
-   */
-  destroy(): void {
-    this._valueChangesSub?.unsubscribe();
-    this._valueChangesSub = null;
   }
 
   // ---- Public API - Error Management ----
@@ -188,17 +144,20 @@ export class FormBridge<T extends FormGroup = FormGroup> {
   }
 
   /**
-   * Clear all API errors from the form controls.
-   * Restores client-side validation state.
+   * Clear only the errors that were set by `applyApiErrors()`.
+   * Client-side validation errors (e.g. `Validators.required`) are preserved.
    */
   clearApiErrors(): void {
-    for (const key of Object.keys(this._form.controls)) {
-      const control = this._form.controls[key];
-      if (control) {
-        control.setErrors(null);
-        control.updateValueAndValidity();
+    for (const [control, keys] of this._apiErrorKeys) {
+      if (!control.errors) continue;
+      const remaining = { ...control.errors };
+      for (const key of keys) {
+        delete remaining[key];
       }
+      control.setErrors(Object.keys(remaining).length > 0 ? remaining : null);
+      control.updateValueAndValidity();
     }
+    this._apiErrorKeys.clear();
     this._form.updateValueAndValidity({ onlySelf: false, emitEvent: true });
     this._apiErrors.set([]);
   }
@@ -252,131 +211,7 @@ export class FormBridge<T extends FormGroup = FormGroup> {
     };
   }
 
-  /**
-   * Wrap an Observable (typically an HTTP call) with automatic form state management.
-   *
-   * - Disables the form and sets isSubmittingSignal to true
-   * - On success: re-enables the form
-   * - On error: re-enables the form and applies API errors
-   *
-   * The error is re-thrown so your subscriber's error handler still runs.
-   *
-   * @deprecated Use the standalone `wrapSubmit()` function instead.
-   * `wrapSubmit` is tree-shakeable and does not couple submit logic to FormBridge.
-   *
-   * @param source - The Observable to wrap (e.g. an HttpClient call)
-   * @param options.extractError - Custom function to extract the error body (default: err.error ?? err)
-   * @returns The wrapped Observable
-   *
-   * @example
-   * ```typescript
-   * bridge.handleSubmit(
-   *   this.http.post('/api/save', this.form.value)
-   * ).subscribe({
-   *   next: () => this.router.navigate(['/success']),
-   *   error: () => console.log('Errors applied to form automatically'),
-   * });
-   * ```
-   */
-  handleSubmit<T>(
-    source: Observable<T>,
-    options?: { extractError?: (err: unknown) => unknown }
-  ): Observable<T> {
-    this.disable();
-    this._isSubmitting.set(true);
-    this.clearApiErrors();
-
-    const extract = options?.extractError ?? ((err: any) => err?.error ?? err);
-
-    return source.pipe(
-      tap(() => {
-        this._isSubmitting.set(false);
-        this.enable();
-      }),
-      catchError((err) => {
-        this._isSubmitting.set(false);
-        this.enable();
-        this.applyApiErrors(extract(err));
-        throw err;
-      })
-    );
-  }
-
-  // ---- Public API - Form State Management ----
-
-  /**
-   * Set default values for the form and reset to them.
-   *
-   * @deprecated Use `form.reset(values)` directly. FormBridge should only
-   * handle API error mapping, not form state management.
-   */
-  setDefaultValues(values: Record<string, unknown>): void {
-    for (const key of Object.keys(values)) {
-      if (this._form.controls[key]) {
-        this._defaultValues[key] = values[key];
-      }
-    }
-    this.reset();
-  }
-
-  /**
-   * Reset the form to its default values and clear all errors.
-   *
-   * @deprecated Use `form.reset()` and `bridge.clearApiErrors()` directly.
-   */
-  reset(): void {
-    this._form.reset(this._defaultValues);
-    this._apiErrors.set([]);
-    this._isDirty.set(false);
-  }
-
-  /**
-   * Enable all controls in the form.
-   *
-   * @deprecated Use the standalone `enableForm()` function instead.
-   */
-  enable(options?: EnableFormOptions): void {
-    for (const key of Object.keys(this._form.controls)) {
-      if (options?.except?.includes(key)) continue;
-      this._form.controls[key].enable();
-    }
-    this._form.updateValueAndValidity({ onlySelf: false, emitEvent: true });
-  }
-
-  /**
-   * Disable all controls in the form.
-   *
-   * @deprecated Use the standalone `disableForm()` function instead.
-   */
-  disable(options?: DisableFormOptions): void {
-    for (const key of Object.keys(this._form.controls)) {
-      if (options?.except?.includes(key)) continue;
-      this._form.controls[key].disable();
-    }
-  }
-
-  /**
-   * Check if the form values have changed compared to the defaults.
-   *
-   * @deprecated Use the standalone `getDirtyValues()` function or
-   * Angular's built-in `form.dirty`.
-   */
-  checkDirty(): boolean {
-    this._computeDirty();
-    return this._isDirty();
-  }
-
   // ---- Public API - Utilities ----
-
-  /**
-   * Convert form values to FormData (for file uploads).
-   * Delegates to the standalone `toFormData()` utility.
-   *
-   * @deprecated Use the standalone `toFormData()` function directly.
-   */
-  toFormData(values?: Record<string, unknown>): FormData {
-    return toFormDataUtil(values ?? this._form.getRawValue());
-  }
 
   /**
    * Access the underlying FormGroup.
@@ -398,28 +233,6 @@ export class FormBridge<T extends FormGroup = FormGroup> {
       Object.assign(merged, CLASS_VALIDATOR_CONSTRAINT_MAP);
     }
     return merged;
-  }
-
-  private _captureDefaults(): void {
-    const rawValues = this._form.getRawValue();
-    for (const [key, value] of Object.entries(rawValues)) {
-      this._defaultValues[key] = value;
-    }
-  }
-
-  private _computeDirty(): void {
-    const currentValues = this._form.getRawValue();
-    let isDirty = false;
-    for (const key of Object.keys(this._defaultValues)) {
-      const current = currentValues[key];
-      const stored = this._defaultValues[key];
-      // Deep comparison via JSON.stringify to handle objects, arrays, dates
-      if (current !== stored && JSON.stringify(current) !== JSON.stringify(stored)) {
-        isDirty = true;
-        break;
-      }
-    }
-    this._isDirty.set(isDirty);
   }
 
   private _applyErrors(fieldErrors: ApiFieldError[]): ResolvedFieldError[] {
@@ -454,6 +267,12 @@ export class FormBridge<T extends FormGroup = FormGroup> {
       // Accumulate: merge with already-pending errors for this control
       const existing = pendingErrors.get(control) ?? (this._mergeErrors ? (control.errors ?? {}) : {});
       pendingErrors.set(control, { ...existing, [finalErrorKey]: message });
+
+      // Track this key as API-set
+      if (!this._apiErrorKeys.has(control)) {
+        this._apiErrorKeys.set(control, new Set());
+      }
+      this._apiErrorKeys.get(control)!.add(finalErrorKey);
 
       resolved.push({ field: fieldError.field, errorKey: finalErrorKey, message });
     }
@@ -534,12 +353,10 @@ export function createFormBridge<T extends FormGroup = FormGroup>(form: T, confi
 }
 
 /**
- * Create a FormBridge and register automatic cleanup via Angular's `DestroyRef`.
+ * Alias for `createFormBridge`.
  *
- * Must be called in an injection context (constructor, field initializer, or
- * inside `runInInjectionContext`). The bridge's internal subscriptions are
- * cleaned up automatically when the component/service is destroyed - no need
- * to call `destroy()` manually.
+ * Both functions are identical since FormBridge no longer holds internal
+ * subscriptions. Kept for API compatibility with existing code.
  *
  * @example
  * ```typescript
@@ -559,8 +376,5 @@ export function createFormBridge<T extends FormGroup = FormGroup>(form: T, confi
  * ```
  */
 export function provideFormBridge<T extends FormGroup = FormGroup>(form: T, config?: FormBridgeConfig): FormBridge<T> {
-  const bridge = new FormBridge(form, config);
-  const destroyRef = inject(DestroyRef);
-  destroyRef.onDestroy(() => bridge.destroy());
-  return bridge;
+  return new FormBridge(form, config);
 }
