@@ -25,6 +25,10 @@ export {
 } from './lib/interceptor/api-error.interceptor';
 export type { ApiErrorInterceptorConfig } from './lib/interceptor/api-error.interceptor';
 
+// Resource integration
+export { connectResource } from './lib/resource/connect-resource';
+export type { ConnectResourceOptions } from './lib/resource/connect-resource';
+
 // Utility functions (tree-shakeable)
 export {
   parseApiErrors,

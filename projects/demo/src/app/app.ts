@@ -13,6 +13,7 @@ import {
   wrapSubmit,
   NgxFormErrorDirective,
   ApiFieldError,
+  GlobalError,
 } from 'ngx-api-forms';
 
 @Component({
@@ -94,6 +95,19 @@ export class App {
   // ---- Standalone Parsing Demo ----
   standalonePreset = signal<string>('class-validator');
   standaloneResult = signal<string>('');
+
+  // ---- Global Errors Demo ----
+  globalForm = this.fb.group({
+    email: [''],
+    password: [''],
+  });
+
+  globalBridge = provideFormBridge(this.globalForm, {
+    preset: djangoPreset(),
+  });
+
+  globalPreset = signal<string>('django');
+  globalResult = signal<string>('');
 
   customJson = signal<string>(JSON.stringify({
     statusCode: 400,
@@ -332,6 +346,53 @@ export class App {
       ],
     };
     this.dirtyBridge.applyApiErrors(apiError);
+  }
+
+  // ---- Global Errors Demo ----
+
+  readonly globalMockErrors: Record<string, unknown> = {
+    django: {
+      non_field_errors: ['Unable to log in with provided credentials.'],
+      email: ['Enter a valid email address.'],
+    },
+    'django-detail': {
+      detail: ['Authentication credentials were not provided.'],
+    },
+    zod: {
+      formErrors: ['Form is invalid', 'Please check all fields'],
+      fieldErrors: {
+        email: ['Invalid email'],
+      },
+    },
+    unmatched: {
+      statusCode: 400,
+      message: [
+        { property: 'email', constraints: { isEmail: 'email must be valid' } },
+        { property: 'ghostField', constraints: { isNotEmpty: 'this field does not exist in form' } },
+      ],
+    },
+  };
+
+  simulateGlobalErrors(): void {
+    const key = this.globalPreset();
+    const error = this.globalMockErrors[key];
+
+    let preset;
+    if (key.startsWith('django')) preset = djangoPreset();
+    else if (key === 'zod') preset = zodPreset();
+    else preset = classValidatorPreset();
+
+    this.globalBridge = createFormBridge(this.globalForm, { preset });
+    const result = this.globalBridge.applyApiErrors(error);
+    this.globalResult.set(JSON.stringify({
+      fieldErrors: result,
+      globalErrors: this.globalBridge.globalErrorsSignal(),
+    }, null, 2));
+  }
+
+  clearGlobalErrors(): void {
+    this.globalBridge.clearApiErrors();
+    this.globalResult.set('');
   }
 
   // ---- Utils ----

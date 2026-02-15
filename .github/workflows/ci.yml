@@ -43,7 +43,7 @@ jobs:
 
       - name: Check bundle size
         run: |
-          MAX_SIZE_KB=48
+          MAX_SIZE_KB=52
           FESM_FILE=$(find dist/ngx-api-forms/fesm2022 -name '*.mjs' | head -1)
           SIZE_KB=$(( $(wc -c < "$FESM_FILE") / 1024 ))
           echo "Bundle size: ${SIZE_KB}KB (max: ${MAX_SIZE_KB}KB)"

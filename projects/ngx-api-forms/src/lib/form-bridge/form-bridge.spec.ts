@@ -168,13 +168,18 @@ describe('FormBridge', () => {
       expect(form.controls['email'].hasError('required')).toBeTrue();
     });
 
-    it('should skip non_field_errors', () => {
+    it('should route non_field_errors to globalErrorsSignal', () => {
       const errors = bridge.applyApiErrors({
         non_field_errors: ['Unable to log in with provided credentials.'],
         email: ['This field is required.'],
       });
 
       expect(errors.length).toBe(1);
+      expect(errors[0].field).toBe('email');
+
+      const global = bridge.globalErrorsSignal();
+      expect(global.length).toBe(1);
+      expect(global[0].message).toBe('Unable to log in with provided credentials.');
     });
   });
 
@@ -724,6 +729,141 @@ describe('FormBridge', () => {
       });
 
       expect(console.warn).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('globalErrorsSignal', () => {
+    it('should capture Django non_field_errors', () => {
+      const bridge = createFormBridge(form, { preset: djangoPreset() });
+
+      bridge.applyApiErrors({
+        non_field_errors: ['Unable to log in with provided credentials.'],
+        email: ['This field is required.'],
+      });
+
+      const global = bridge.globalErrorsSignal();
+      expect(global.length).toBe(1);
+      expect(global[0].message).toBe('Unable to log in with provided credentials.');
+      expect(global[0].constraint).toBeTruthy();
+
+      // Field errors should still be applied to the form
+      expect(form.controls['email'].hasError('required')).toBeTrue();
+    });
+
+    it('should capture Django detail errors', () => {
+      const bridge = createFormBridge(form, { preset: djangoPreset() });
+
+      bridge.applyApiErrors({
+        detail: ['Authentication credentials were not provided.'],
+      });
+
+      const global = bridge.globalErrorsSignal();
+      expect(global.length).toBe(1);
+      expect(global[0].message).toBe('Authentication credentials were not provided.');
+    });
+
+    it('should capture Zod formErrors', () => {
+      const bridge = createFormBridge(form, { preset: zodPreset() });
+
+      bridge.applyApiErrors({
+        formErrors: ['Form is invalid', 'Please fix all errors'],
+        fieldErrors: {
+          email: ['Invalid email'],
+        },
+      });
+
+      const global = bridge.globalErrorsSignal();
+      expect(global.length).toBe(2);
+      expect(global[0].message).toBe('Form is invalid');
+      expect(global[1].message).toBe('Please fix all errors');
+
+      // Field errors should still work
+      expect(form.controls['email'].errors).toBeTruthy();
+    });
+
+    it('should capture Zod issues with empty path as global', () => {
+      const bridge = createFormBridge(form, { preset: zodPreset() });
+
+      bridge.applyApiErrors({
+        issues: [
+          { code: 'custom', path: [], message: 'Form-level error' },
+          { code: 'invalid_string', validation: 'email', path: ['email'], message: 'Invalid email' },
+        ],
+      });
+
+      const global = bridge.globalErrorsSignal();
+      expect(global.length).toBe(1);
+      expect(global[0].message).toBe('Form-level error');
+
+      // Field error should still apply
+      expect(form.controls['email'].errors).toBeTruthy();
+    });
+
+    it('should route unmatched field errors to globalErrorsSignal', () => {
+      const bridge = createFormBridge(form, { preset: classValidatorPreset() });
+
+      bridge.applyApiErrors({
+        message: [
+          { property: 'email', constraints: { isEmail: 'bad email' } },
+          { property: 'nonExistentField', constraints: { isNotEmpty: 'field required' } },
+        ],
+      });
+
+      // Field error applied normally
+      expect(form.controls['email'].hasError('email')).toBeTrue();
+
+      // Unmatched field routed to global
+      const global = bridge.globalErrorsSignal();
+      expect(global.length).toBe(1);
+      expect(global[0].message).toBe('field required');
+      expect(global[0].originalField).toBe('nonExistentField');
+    });
+
+    it('should be cleared by clearApiErrors', () => {
+      const bridge = createFormBridge(form, { preset: djangoPreset() });
+
+      bridge.applyApiErrors({
+        non_field_errors: ['Login failed'],
+        email: ['Required'],
+      });
+
+      expect(bridge.globalErrorsSignal().length).toBe(1);
+      expect(bridge.errorsSignal().length).toBe(1);
+
+      bridge.clearApiErrors();
+
+      expect(bridge.globalErrorsSignal().length).toBe(0);
+      expect(bridge.errorsSignal().length).toBe(0);
+    });
+
+    it('should update hasErrorsSignal when only global errors exist', () => {
+      const cleanForm = new FormBuilder().group({ email: [''] });
+      const bridge = createFormBridge(cleanForm, { preset: djangoPreset() });
+
+      expect(bridge.hasErrorsSignal()).toBeFalse();
+
+      bridge.applyApiErrors({
+        non_field_errors: ['Server error'],
+      });
+
+      expect(bridge.hasErrorsSignal()).toBeTrue();
+      expect(bridge.errorsSignal().length).toBe(0); // No field errors
+      expect(bridge.globalErrorsSignal().length).toBe(1);
+    });
+
+    it('should be replaced on each applyApiErrors call', () => {
+      const bridge = createFormBridge(form, { preset: djangoPreset() });
+
+      bridge.applyApiErrors({
+        non_field_errors: ['Error 1', 'Error 2'],
+      });
+      expect(bridge.globalErrorsSignal().length).toBe(2);
+
+      bridge.applyApiErrors({
+        non_field_errors: ['Error 3'],
+      });
+      expect(bridge.globalErrorsSignal().length).toBe(1);
+      expect(bridge.globalErrorsSignal()[0].message).toBe('Error 3');
     });
   });
 });

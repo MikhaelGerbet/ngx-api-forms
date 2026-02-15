@@ -17,7 +17,7 @@
  * }
  * ```
  */
-import { ApiFieldError, DjangoValidationErrors, ErrorPreset } from '../models/api-forms.models';
+import { ApiFieldError, DjangoValidationErrors, ErrorPreset, GLOBAL_ERROR_FIELD } from '../models/api-forms.models';
 
 /**
  * Infers a constraint key from a Django REST Framework validation message.
@@ -89,10 +89,12 @@ export function djangoPreset(options?: { camelCase?: boolean; noInference?: bool
       for (const [rawField, messages] of Object.entries(errors)) {
         if (!Array.isArray(messages)) continue;
 
-        // Skip non-field errors (can be handled separately by the consumer)
-        if (rawField === 'non_field_errors' || rawField === 'detail') continue;
-
-        const field = shouldCamelCase ? snakeToCamel(rawField) : rawField;
+        // Non-field errors are emitted with the global sentinel field name
+        // so that FormBridge routes them to globalErrorsSignal.
+        const isGlobal = rawField === 'non_field_errors' || rawField === 'detail';
+        const field = isGlobal
+          ? GLOBAL_ERROR_FIELD
+          : (shouldCamelCase ? snakeToCamel(rawField) : rawField);
 
         for (const message of messages) {
           if (typeof message !== 'string') continue;

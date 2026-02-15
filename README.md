@@ -58,7 +58,7 @@ This library is not a universal error handler. It only helps when your API retur
 In practice, this rules out:
 - APIs that only return a single error string for the whole request
 - APIs returning generic 500 errors
-- Errors not tied to a specific form field (use a toast or banner instead)
+- Errors not tied to user input (infrastructure failures, rate limiting)
 
 If you're unsure whether your backend is compatible, call `parseApiErrors(err.error, yourPreset())` in a test and check the output. If it returns an empty array, the format is not supported and you either need a custom preset or this library is not the right tool.
 
@@ -207,6 +207,28 @@ const bridge = provideFormBridge(form, {
 // 4. Write a custom preset for full control (see below)
 ```
 
+## Global Errors
+
+Some backends return errors not tied to any specific field -- Django's `non_field_errors`, Zod's `formErrors`, or a field name that does not match any form control. These errors are collected in `globalErrorsSignal` instead of being silently dropped.
+
+```typescript
+bridge.applyApiErrors({
+  non_field_errors: ['Unable to log in with provided credentials.'],
+  email: ['This field is required.'],
+});
+
+// Field errors are applied to form controls as usual
+console.log(form.controls.email.hasError('required')); // true
+
+// Global errors are available via dedicated signal
+console.log(bridge.globalErrorsSignal());
+// [{ message: 'Unable to log in with provided credentials.', constraint: 'serverError' }]
+```
+
+`clearApiErrors()` clears both field errors and global errors. The `hasErrorsSignal` signal accounts for global errors too.
+
+Unmatched fields (errors referencing a field that does not exist in the form) are also routed to `globalErrorsSignal` with the original field name preserved in the `originalField` property.
+
 ## Switching Backends
 
 Each backend has its own preset. Pass an array if your app talks to multiple APIs -- they are tried in order until one matches.
@@ -301,6 +323,38 @@ export const myInterceptor: HttpInterceptorFn = (req, next) => {
 };
 ```
 
+## Resource Integration (Angular 19+)
+
+When using `resource()` or `rxResource()`, call `connectResource` to wire the error signal to a FormBridge. The effect applies errors automatically when the resource fails and clears them when it succeeds.
+
+```typescript
+import { rxResource } from '@angular/core/rxjs-interop';
+import { connectResource, provideFormBridge, djangoPreset } from 'ngx-api-forms';
+
+@Component({ ... })
+export class EditComponent {
+  private http = inject(HttpClient);
+  form = inject(FormBuilder).group({ name: [''], email: [''] });
+  bridge = provideFormBridge(this.form, { preset: djangoPreset() });
+
+  saveResource = rxResource({
+    loader: () => this.http.put('/api/profile', this.form.value),
+  });
+
+  // Wires saveResource.error() -> bridge.applyApiErrors()
+  // Clears errors automatically on success
+  private ref = connectResource(this.bridge, this.saveResource.error);
+}
+```
+
+Works with any `Signal<unknown>` -- not limited to Angular resources. If called outside an injection context (e.g. `ngOnInit`), pass an explicit `Injector`:
+
+```typescript
+connectResource(this.bridge, this.myResource.error, {
+  injector: this.injector,
+});
+```
+
 ## Typed Forms
 
 `FormBridge` is generic. When you pass a typed `FormGroup`, the `form` getter preserves the type:
@@ -355,9 +409,17 @@ Create with `provideFormBridge(form, config?)` or `createFormBridge(form, config
 
 | Signal | Type | Description |
 |--------|------|-------------|
-| `errorsSignal` | `Signal<ResolvedFieldError[]>` | All current API errors |
+| `errorsSignal` | `Signal<ResolvedFieldError[]>` | All current field-level API errors |
+| `globalErrorsSignal` | `Signal<GlobalError[]>` | Non-field errors (Django `non_field_errors`, Zod `formErrors`, unmatched fields) |
 | `firstErrorSignal` | `Signal<FirstError \| null>` | First error, or null |
-| `hasErrorsSignal` | `Signal<boolean>` | Whether any API errors exist |
+| `hasErrorsSignal` | `Signal<boolean>` | Whether any API errors exist (field or global) |
+
+### Resource Integration
+
+| Export | Description |
+|--------|-------------|
+| `connectResource(bridge, errorSignal, options?)` | Wire a `Signal<unknown>` (e.g. `resource().error`) to a FormBridge. Returns `EffectRef` |
+| `GLOBAL_ERROR_FIELD` | Sentinel field name (`'__global__'`) used by presets to mark non-field errors |
 
 ### Standalone Utility Functions
 

@@ -20,7 +20,7 @@
  * ]
  * ```
  */
-import { ApiFieldError, ErrorPreset, ZodFlatError } from '../models/api-forms.models';
+import { ApiFieldError, ErrorPreset, GLOBAL_ERROR_FIELD, ZodFlatError } from '../models/api-forms.models';
 
 interface ZodIssue {
   code: string;
@@ -100,10 +100,19 @@ export function zodPreset(options?: { noInference?: boolean }): ErrorPreset {
     parse(error: unknown): ApiFieldError[] {
       if (!error || typeof error !== 'object') return [];
 
-      // Format 1: Flattened error { fieldErrors: { ... } }
+      // Format 1: Flattened error { fieldErrors: { ... }, formErrors: [...] }
       const flat = error as Partial<ZodFlatError>;
       if (flat.fieldErrors && typeof flat.fieldErrors === 'object') {
         const result: ApiFieldError[] = [];
+
+        // Collect form-level (global) errors
+        if (Array.isArray(flat.formErrors)) {
+          for (const message of flat.formErrors) {
+            if (typeof message !== 'string') continue;
+            result.push({ field: GLOBAL_ERROR_FIELD, constraint: 'serverError', message });
+          }
+        }
+
         for (const [field, messages] of Object.entries(flat.fieldErrors)) {
           if (!Array.isArray(messages)) continue;
           for (const message of messages) {
@@ -118,34 +127,43 @@ export function zodPreset(options?: { noInference?: boolean }): ErrorPreset {
       const err = error as Record<string, unknown>;
       if (Array.isArray(err['issues'])) {
         const issues = err['issues'] as ZodIssue[];
-        return issues
-          .filter((issue) => issue.path && issue.path.length > 0)
-          .map((issue) => ({
-            field: issue.path.map(String).join('.'),
-            constraint: skipInference ? 'serverError' : zodCodeToConstraint(issue),
-            message: issue.message,
-          }));
+        return issues.map((issue) => ({
+          field: issue.path && issue.path.length > 0
+            ? issue.path.map(String).join('.')
+            : GLOBAL_ERROR_FIELD,
+          constraint: skipInference ? 'serverError' : zodCodeToConstraint(issue),
+          message: issue.message,
+        }));
       }
 
       // Format 3: Direct array of issues
       if (Array.isArray(error)) {
         const issues = error as ZodIssue[];
         if (issues.length > 0 && 'code' in issues[0] && 'path' in issues[0]) {
-          return issues
-            .filter((issue) => issue.path && issue.path.length > 0)
-            .map((issue) => ({
-              field: issue.path.map(String).join('.'),
-              constraint: skipInference ? 'serverError' : zodCodeToConstraint(issue),
-              message: issue.message,
-            }));
+          return issues.map((issue) => ({
+            field: issue.path && issue.path.length > 0
+              ? issue.path.map(String).join('.')
+              : GLOBAL_ERROR_FIELD,
+            constraint: skipInference ? 'serverError' : zodCodeToConstraint(issue),
+            message: issue.message,
+          }));
         }
       }
 
-      // Format 4: Wrapped { errors: { fieldErrors: {...} } } or { error: {...} }
+      // Format 4: Wrapped { errors: { fieldErrors: {...}, formErrors: [...] } } or { error: {...} }
       if (err['errors'] && typeof err['errors'] === 'object') {
         const nested = err['errors'] as Partial<ZodFlatError>;
         if (nested.fieldErrors && typeof nested.fieldErrors === 'object') {
           const result: ApiFieldError[] = [];
+
+          // Collect form-level (global) errors from wrapped format
+          if (Array.isArray(nested.formErrors)) {
+            for (const message of nested.formErrors) {
+              if (typeof message !== 'string') continue;
+              result.push({ field: GLOBAL_ERROR_FIELD, constraint: 'serverError', message });
+            }
+          }
+
           for (const [field, messages] of Object.entries(nested.fieldErrors)) {
             if (!Array.isArray(messages)) continue;
             for (const message of messages) {

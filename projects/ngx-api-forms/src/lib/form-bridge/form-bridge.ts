@@ -17,6 +17,8 @@ import {
   ErrorPreset,
   FirstError,
   FormBridgeConfig,
+  GlobalError,
+  GLOBAL_ERROR_FIELD,
   I18nConfig,
   ResolvedFieldError,
 } from '../models/api-forms.models';
@@ -64,6 +66,9 @@ export class FormBridge<T extends FormGroup = FormGroup> {
   /** Signal containing the last set of resolved API errors */
   private readonly _apiErrors: WritableSignal<ResolvedFieldError[]> = signal([]);
 
+  /** Signal containing global (non-field) errors */
+  private readonly _globalErrors: WritableSignal<GlobalError[]> = signal([]);
+
   /** Tracks which error keys were set by the API on each control */
   private _apiErrorKeys = new Map<AbstractControl, Set<string>>();
 
@@ -72,6 +77,16 @@ export class FormBridge<T extends FormGroup = FormGroup> {
   /** Reactive signal of all current API errors applied to the form */
   readonly errorsSignal: Signal<ResolvedFieldError[]> = this._apiErrors.asReadonly();
 
+  /**
+   * Reactive signal of global (non-field) errors.
+   *
+   * Contains errors from:
+   * - Django `non_field_errors` / `detail`
+   * - Zod `formErrors`
+   * - Any API error whose field does not match a form control
+   */
+  readonly globalErrorsSignal: Signal<GlobalError[]> = this._globalErrors.asReadonly();
+
   /** Reactive signal of the first error (or null) */
   readonly firstErrorSignal: Signal<FirstError | null> = computed(() => {
     const errors = this._apiErrors();
@@ -79,7 +94,9 @@ export class FormBridge<T extends FormGroup = FormGroup> {
   });
 
   /** Whether any API errors are currently applied */
-  readonly hasErrorsSignal: Signal<boolean> = computed(() => this._apiErrors().length > 0);
+  readonly hasErrorsSignal: Signal<boolean> = computed(() =>
+    this._apiErrors().length > 0 || this._globalErrors().length > 0,
+  );
 
   constructor(form: T, config?: FormBridgeConfig) {
     this._form = form;
@@ -160,6 +177,7 @@ export class FormBridge<T extends FormGroup = FormGroup> {
     this._apiErrorKeys.clear();
     this._form.updateValueAndValidity({ onlySelf: false, emitEvent: true });
     this._apiErrors.set([]);
+    this._globalErrors.set([]);
   }
 
   /**
@@ -237,19 +255,35 @@ export class FormBridge<T extends FormGroup = FormGroup> {
 
   private _applyErrors(fieldErrors: ApiFieldError[]): ResolvedFieldError[] {
     const resolved: ResolvedFieldError[] = [];
+    const globalErrors: GlobalError[] = [];
 
     // Accumulate errors per control to avoid overwrite within a single applyApiErrors call
     const pendingErrors = new Map<AbstractControl, ValidationErrors>();
 
     for (const fieldError of fieldErrors) {
+      // Global errors (explicit sentinel or unmatched field)
+      if (fieldError.field === GLOBAL_ERROR_FIELD) {
+        globalErrors.push({
+          message: fieldError.message,
+          constraint: fieldError.constraint,
+        });
+        continue;
+      }
+
       let control: AbstractControl | null = this._form.controls[fieldError.field] ?? null;
       if (!control) {
         // Try nested path (e.g. 'address.city' or 'items.0.name')
         control = this._resolveNestedControl(fieldError.field);
         if (!control) {
+          // Route unmatched field errors to global errors
+          globalErrors.push({
+            message: fieldError.message,
+            constraint: fieldError.constraint,
+            originalField: fieldError.field,
+          });
           if (this._debug) {
             console.warn(
-              `[ngx-api-forms] Field "${fieldError.field}" does not match any form control.`,
+              `[ngx-api-forms] Field "${fieldError.field}" does not match any form control - routed to globalErrorsSignal.`,
               'Available controls:', Object.keys(this._form.controls).join(', '),
             );
           }
@@ -288,6 +322,9 @@ export class FormBridge<T extends FormGroup = FormGroup> {
       control.markAsTouched();
       control.setErrors(errors);
     }
+
+    // Publish global errors
+    this._globalErrors.set(globalErrors);
 
     return resolved;
   }

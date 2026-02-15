@@ -54,6 +54,37 @@ export interface ZodFlatError {
 }
 
 // ---------------------------------------------------------------------------
+// Global (Non-Field) Errors
+// ---------------------------------------------------------------------------
+
+/**
+ * Sentinel field name used by presets to tag errors that are not bound to a
+ * specific form control (e.g. Django `non_field_errors`, Zod `formErrors`).
+ *
+ * FormBridge also routes any ApiFieldError whose field does not match a control
+ * to `globalErrorsSignal`, so custom presets do not need to use this constant -
+ * unmatched fields are captured automatically.
+ */
+export const GLOBAL_ERROR_FIELD = '__global__';
+
+/**
+ * An error that does not belong to any specific form control.
+ *
+ * Sources:
+ * - Django `non_field_errors` / `detail`
+ * - Zod `formErrors`
+ * - Any API error whose field name does not match a control in the form
+ */
+export interface GlobalError {
+  /** The human-readable error message */
+  message: string;
+  /** The constraint key (e.g. 'serverError') */
+  constraint: string;
+  /** The original field name from the API response, if any */
+  originalField?: string;
+}
+
+// ---------------------------------------------------------------------------
 // Error Preset
 // ---------------------------------------------------------------------------
 

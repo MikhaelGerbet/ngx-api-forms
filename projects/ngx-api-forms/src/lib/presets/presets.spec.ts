@@ -2,6 +2,7 @@ import { classValidatorPreset } from './class-validator.preset';
 import { laravelPreset } from './laravel.preset';
 import { djangoPreset } from './django.preset';
 import { zodPreset } from './zod.preset';
+import { GLOBAL_ERROR_FIELD } from '../models/api-forms.models';
 
 describe('Error Presets', () => {
   describe('classValidatorPreset', () => {
@@ -161,13 +162,16 @@ describe('Error Presets', () => {
       expect(result[1].field).toBe('firstName');
     });
 
-    it('should skip non_field_errors', () => {
+    it('should emit non_field_errors as global errors', () => {
       const result = preset.parse({
         non_field_errors: ['Unable to log in.'],
         email: ['This field is required.'],
       });
 
-      expect(result.length).toBe(1);
+      expect(result.length).toBe(2);
+      const global = result.filter(e => e.field === GLOBAL_ERROR_FIELD);
+      expect(global.length).toBe(1);
+      expect(global[0].message).toBe('Unable to log in.');
     });
 
     it('should keep snake_case when camelCase is disabled', () => {
@@ -278,6 +282,35 @@ describe('Error Presets', () => {
         expect(result[0].constraint).toBe('serverError');
         expect(result[1].constraint).toBe('serverError');
       });
+    });
+
+    it('should parse formErrors as global errors', () => {
+      const result = preset.parse({
+        formErrors: ['Form is invalid', 'Check credentials'],
+        fieldErrors: {
+          email: ['Invalid email'],
+        },
+      });
+
+      expect(result.length).toBe(3);
+      const global = result.filter(e => e.field === GLOBAL_ERROR_FIELD);
+      expect(global.length).toBe(2);
+      expect(global[0].message).toBe('Form is invalid');
+      expect(global[1].message).toBe('Check credentials');
+    });
+
+    it('should treat issues with empty path as global', () => {
+      const result = preset.parse({
+        issues: [
+          { code: 'custom', path: [], message: 'Form-level error' },
+          { code: 'invalid_string', validation: 'email', path: ['email'], message: 'Bad email' },
+        ],
+      });
+
+      expect(result.length).toBe(2);
+      const global = result.filter(e => e.field === GLOBAL_ERROR_FIELD);
+      expect(global.length).toBe(1);
+      expect(global[0].message).toBe('Form-level error');
     });
   });
 });
