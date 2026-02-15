@@ -10,6 +10,9 @@
     "watch": "ng build ngx-api-forms --watch",
     "test": "ng test",
     "test:ci": "ng test ngx-api-forms --no-watch --browsers=ChromeHeadless",
+    "test:schematic": "node --test projects/ngx-api-forms/schematics/ng-add/index.spec.js",
+    "e2e": "npx playwright test",
+    "e2e:ci": "npx playwright test --reporter=list",
     "lint": "ng lint ngx-api-forms"
   },
   "prettier": {
@@ -40,6 +43,7 @@
     "@angular/build": "^20.3.15",
     "@angular/cli": "^20.3.2",
     "@angular/compiler-cli": "^20.3.0",
+    "@playwright/test": "^1.58.2",
     "@types/jasmine": "~5.1.0",
     "angular-eslint": "21.0.1",
     "concurrently": "^9.2.1",

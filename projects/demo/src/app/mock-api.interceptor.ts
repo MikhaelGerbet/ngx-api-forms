@@ -15,11 +15,11 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
   switch (endpoint) {
     case 'register': {
       const errors: Record<string, string[]> = {};
-      if (!body?.['email'] || !(body['email'] as string).includes('@')) {
+      if (!body?.['email'] || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body['email'] as string)) {
         errors['email'] = ['This field is required.', 'Enter a valid email address.'];
       }
-      if (!body?.['username'] || (body['username'] as string).length < 3) {
-        errors['username'] = ['Ensure this field has at least 3 characters.'];
+      if (!body?.['username'] || (body['username'] as string).length < 4) {
+        errors['username'] = ['Ensure this field has at least 4 characters.'];
       }
       if (!body?.['password'] || (body['password'] as string).length < 8) {
         errors['password'] = ['Ensure this field has at least 8 characters.'];
