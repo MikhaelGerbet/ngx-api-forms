@@ -104,6 +104,7 @@ export class App {
 
   liveForm = this.fb.group({
     email: ['', [Validators.required, Validators.email]],
+    // Client allows 3 chars, server requires 4 - intentional gap to demo server-side error handling
     username: ['', [Validators.required, Validators.minLength(3)]],
     password: ['', [Validators.required, Validators.minLength(8)]],
   });

@@ -34,7 +34,18 @@ projects/
 ## Running Tests
 
 ```bash
+# Unit tests (Karma, 163 specs)
 npm run test:ci
+
+# Schematic tests (ng-add auto-inject)
+npm run test:schematic
+
+# End-to-end tests (Playwright, requires Chromium)
+npx playwright install chromium   # first time only
+npm run e2e
+
+# E2E in CI mode (list reporter, no headed browser)
+npm run e2e:ci
 ```
 
 ## Creating a New Preset
