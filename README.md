@@ -1,6 +1,6 @@
 # ngx-api-forms
 
-Angular library that maps API validation errors to Reactive Forms controls. Works with NestJS (class-validator), Laravel, Django REST Framework, and Zod out of the box.
+**API error parsing library for Angular.** Normalizes validation error responses from any backend into a consistent format your forms can consume. Not a display library -- a parsing library.
 
 [![npm version](https://img.shields.io/npm/v/ngx-api-forms?style=flat-square)](https://www.npmjs.com/package/ngx-api-forms)
 [![License: MIT](https://img.shields.io/npm/l/ngx-api-forms?style=flat-square)](LICENSE)
@@ -12,10 +12,10 @@ Angular library that maps API validation errors to Reactive Forms controls. Work
 
 ## The Problem
 
-Every Angular app that consumes an API with server-side validation ends up writing the same boilerplate. The backend returns errors in its own format, and the frontend parses them manually:
+Libraries like `@ngneat/error-tailor` or `ngx-valdemort` handle the **display** side -- rendering `Validators.required` messages in templates. But when your API returns a 422, those libraries can't help. You're left writing backend-specific parsing logic by hand:
 
 ```typescript
-// Typical approach - brittle, repetitive, backend-specific
+// Brittle, repetitive, backend-specific
 this.http.post('/api/register', data).subscribe({
   error: (err) => {
     const messages = err.error?.message; // NestJS format
@@ -32,48 +32,30 @@ this.http.post('/api/register', data).subscribe({
 });
 ```
 
-This code has three problems:
+Switch from NestJS to Laravel and every error handler must be rewritten. Ten forms means ten copies of the same parsing logic. Most teams flatten everything into `{ serverError: message }`, losing constraint semantics entirely.
 
-1. **It is backend-specific.** Switch from NestJS to Laravel and every error handler must be rewritten. The error shapes have nothing in common.
-2. **It loses constraint semantics.** Most teams flatten everything into a generic `{ serverError: message }`, making it impossible to differentiate "required" from "email" in templates.
-3. **It scales linearly.** Ten forms means ten copies of the same parsing logic. Nobody tests them.
-
-Libraries like `@ngneat/error-tailor` or `ngx-valdemort` solve the display side - rendering client-side `Validators.required` messages. But they do nothing about parsing API responses. That gap between the API and Reactive Forms is what ngx-api-forms fills.
-
-## The Solution
-
-```typescript
-bridge.applyApiErrors(err.error);
-```
-
-One call. The library parses the error payload, identifies which fields are affected, maps constraint types, and calls `setErrors()` on the right controls. Switch backends by swapping a preset - no other code changes.
-
-## Features
-
-- **Multi-backend presets** - NestJS/class-validator, Laravel, Django REST, Zod
-- **Standalone parsing** - `parseApiErrors()` works without a form (interceptors, stores, effects)
-- **Angular Signals** - reactive error state via `errorsSignal`, `firstErrorSignal`, `hasErrorsSignal`
-- **Typed forms** - `FormBridge<T>` preserves your `FormGroup` type through the API
-- **i18n support** - translation key prefixes or custom resolver functions
-- **SSR compatible** - no browser-only APIs
-- **Tree-shakeable** - import only what you need
-- **Error directive** - `ngxFormError` for declarative error display in templates
-- **Submit lifecycle** - `handleSubmit()` and `wrapSubmit()` manage disable/enable and loading state
-- **Extensible** - custom presets, interceptors, constraint maps
-- **Zero dependencies** - only Angular as peer dependency
-
-## Installation
-
-```bash
-npm install ngx-api-forms
-```
+**ngx-api-forms fills the gap between the API and Reactive Forms.**
 
 ## Quick Start
+
+### Minimal: parse errors without a form
+
+```typescript
+import { parseApiErrors, laravelPreset } from 'ngx-api-forms';
+
+const errors = parseApiErrors(apiResponse, laravelPreset());
+// [{ field: 'email', constraint: 'required', message: 'The email field is required.' }]
+```
+
+One function, one preset, structured output. No form needed. Works in interceptors, NgRx effects, services, tests -- anywhere.
+
+### Full: parse and apply to a form
 
 ```typescript
 import { Component, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { createFormBridge, classValidatorPreset, NgxFormErrorDirective } from 'ngx-api-forms';
+import { HttpClient } from '@angular/common/http';
+import { provideFormBridge, classValidatorPreset, NgxFormErrorDirective } from 'ngx-api-forms';
 
 @Component({
   standalone: true,
@@ -91,6 +73,7 @@ import { createFormBridge, classValidatorPreset, NgxFormErrorDirective } from 'n
   `
 })
 export class MyComponent {
+  private http = inject(HttpClient);
   private fb = inject(FormBuilder);
 
   form = this.fb.group({
@@ -98,56 +81,32 @@ export class MyComponent {
     name: ['', [Validators.required, Validators.minLength(3)]],
   });
 
-  bridge = createFormBridge(this.form, {
+  // Auto-cleanup via DestroyRef -- no manual destroy() needed
+  bridge = provideFormBridge(this.form, {
     preset: classValidatorPreset(),
   });
 
   onSubmit() {
-    this.api.save(this.form.value).subscribe({
+    this.http.post('/api/save', this.form.value).subscribe({
       error: (err) => this.bridge.applyApiErrors(err.error)
     });
   }
 }
 ```
 
-## Switching Backends
+## Installation
 
-Each backend has its own preset. Pass an array if your app talks to multiple APIs - they are tried in order until one matches.
-
-```typescript
-import { laravelPreset, djangoPreset, zodPreset } from 'ngx-api-forms';
-
-// Laravel
-const bridge = createFormBridge(form, { preset: laravelPreset() });
-
-// Django REST Framework
-const bridge = createFormBridge(form, { preset: djangoPreset() });
-
-// Zod (e.g. with tRPC)
-const bridge = createFormBridge(form, { preset: zodPreset() });
-
-// Multiple presets, tried in order
-const bridge = createFormBridge(form, {
-  preset: [classValidatorPreset(), laravelPreset()]
-});
+```bash
+npm install ngx-api-forms
 ```
 
-## Typed Forms
+Or with `ng add` to scaffold an example component with your backend preset:
 
-`FormBridge` is generic. When you pass a typed `FormGroup`, the `form` getter preserves the type:
-
-```typescript
-interface LoginForm {
-  email: FormControl<string>;
-  password: FormControl<string>;
-}
-
-const form = new FormGroup<LoginForm>({ ... });
-const bridge = createFormBridge(form);
-
-// bridge.form is typed as FormGroup<LoginForm>
-bridge.form.controls.email; // FormControl<string> - full autocompletion
+```bash
+ng add ngx-api-forms --preset=laravel
 ```
+
+Available presets: `laravel`, `django`, `express-validator`, `spring`.
 
 ## Supported Backend Formats
 
@@ -188,84 +147,57 @@ bridge.form.controls.email; // FormControl<string> - full autocompletion
 }
 ```
 
-## API Reference
+## Constraint Inference Limitations
 
-### FormBridge
+The Laravel, Django, and Zod presets infer constraint types (e.g. "required", "email") by pattern-matching on the English text of error messages. This works reliably with default backend messages but has known limitations:
 
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `applyApiErrors(error)` | `ResolvedFieldError[]` | Parse and apply API errors to form controls |
-| `clearApiErrors()` | `void` | Remove all API-set errors |
-| `getFirstError()` | `FirstError \| null` | First error across all controls |
-| `getFieldErrors(field)` | `ValidationErrors \| null` | Errors for a specific field |
-| `setDefaultValues(values)` | `void` | Store defaults and patch the form |
-| `reset()` | `void` | Reset to defaults, clear errors |
-| `enable(options?)` | `void` | Enable controls (supports `except` list) |
-| `disable(options?)` | `void` | Disable controls (supports `except` list) |
-| `toFormData(values?)` | `FormData` | Convert form values to FormData |
-| `handleSubmit(source)` | `Observable<T>` | *(deprecated)* Wrap an Observable: disable form, apply errors on failure, re-enable. Use standalone `wrapSubmit()` instead. |
-| `addInterceptor(fn)` | `() => void` | Register an error interceptor. Returns a dispose function |
-| `checkDirty()` | `boolean` | Check if form differs from defaults |
-| `destroy()` | `void` | Clean up internal subscriptions |
+- **Translated messages**: If your backend returns messages in a non-English language, inference falls back to `'invalid'` for most constraints.
+- **Custom messages**: Overridden validation messages (e.g. `'Please provide your email'` instead of `'The email field is required'`) may not match the inference patterns.
+- **NestJS/class-validator does not have this limitation** because it transmits the constraint key directly (e.g. `isEmail`, `isNotEmpty`).
 
-### Standalone Functions
-
-| Function | Description |
-|----------|-------------|
-| `parseApiErrors(error, preset?, options?)` | Parse API errors without a form. Works in interceptors, stores, effects. Pass `{ debug: true }` to log warnings. |
-| `wrapSubmit(form, source, options?)` | Submit lifecycle (disable/enable) without FormBridge. |
-| `toFormData(data)` | Convert a plain object to FormData. Handles Files, Blobs, Arrays, nested objects. |
-| `enableForm(form, options?)` | Enable all controls, with optional `except` list. |
-| `disableForm(form, options?)` | Disable all controls, with optional `except` list. |
-| `clearFormErrors(form)` | Clear all errors from all controls. |
-| `getDirtyValues(form)` | Return only the dirty fields and their values. |
-| `hasError(form, errorKey)` | Check if any control has a specific error. |
-| `getErrorMessage(form, field, key?)` | Get the error message string for a field. |
-
-### Signals
-
-| Signal | Type | Description |
-|--------|------|-------------|
-| `errorsSignal` | `Signal<ResolvedFieldError[]>` | All current API errors |
-| `firstErrorSignal` | `Signal<FirstError \| null>` | First error, or null |
-| `hasErrorsSignal` | `Signal<boolean>` | Whether any API errors exist |
-| `isDirtySignal` | `Signal<boolean>` | Whether form changed from defaults (updates reactively on every value change) |
-| `isSubmittingSignal` | `Signal<boolean>` | Whether a submit is in progress (via handleSubmit) |
-
-### Configuration
+When inference fails, you have three options:
 
 ```typescript
-interface FormBridgeConfig {
-  preset?: ErrorPreset | ErrorPreset[];
-  constraintMap?: Record<string, string>;
-  i18n?: {
-    prefix?: string;
-    resolver?: (field, constraint, message) => string | null;
-  };
-  catchAll?: boolean;     // Apply unmatched errors as { generic: msg }
-  mergeErrors?: boolean;  // Merge with existing errors instead of replacing
-  debug?: boolean;        // Log warnings when presets or fields don't match
-}
+// 1. Custom constraintMap to override specific mappings
+const bridge = createFormBridge(form, {
+  preset: laravelPreset(),
+  constraintMap: { 'mon_erreur_custom': 'required' },
+});
+
+// 2. catchAll to apply unmatched errors as { generic: msg }
+const bridge = createFormBridge(form, {
+  preset: laravelPreset(),
+  catchAll: true,
+});
+
+// 3. Write a custom preset for full control (see below)
 ```
 
-## Standalone Parsing
+## Switching Backends
 
-`parseApiErrors` extracts and normalizes errors from any API response without touching a form. This is the function to use when you don't have (or don't want) a FormBridge - in HttpInterceptors, NgRx effects, service layers, or test utilities.
+Each backend has its own preset. Pass an array if your app talks to multiple APIs -- they are tried in order until one matches.
 
 ```typescript
-import { parseApiErrors, laravelPreset } from 'ngx-api-forms';
+import { laravelPreset, djangoPreset, zodPreset } from 'ngx-api-forms';
 
-// In a service, store effect, or anywhere:
-const errors = parseApiErrors(apiResponse, laravelPreset());
-// [{ field: 'email', constraint: 'required', message: 'The email field is required.' }]
+// Laravel
+const bridge = createFormBridge(form, { preset: laravelPreset() });
 
-// Multi-preset: tries each until one matches
-const errors = parseApiErrors(body, [zodPreset(), classValidatorPreset()]);
+// Django REST Framework
+const bridge = createFormBridge(form, { preset: djangoPreset() });
+
+// Zod (e.g. with tRPC)
+const bridge = createFormBridge(form, { preset: zodPreset() });
+
+// Multiple presets, tried in order
+const bridge = createFormBridge(form, {
+  preset: [classValidatorPreset(), laravelPreset()]
+});
 ```
 
-### Global Error Handling with HttpInterceptor
+## Global Error Handling with HttpInterceptor
 
-`parseApiErrors` integrates cleanly with Angular's functional interceptors to centralize error extraction across the entire application:
+`parseApiErrors` integrates with Angular's functional interceptors to centralize error extraction for the entire app:
 
 ```typescript
 import { HttpInterceptorFn, HttpErrorResponse } from '@angular/common/http';
@@ -290,67 +222,116 @@ export const apiErrorInterceptor: HttpInterceptorFn = (req, next) => {
 
 Components can then read from the error store, or still use `bridge.applyApiErrors()` for form-specific handling.
 
+## Typed Forms
+
+`FormBridge` is generic. When you pass a typed `FormGroup`, the `form` getter preserves the type:
+
+```typescript
+interface LoginForm {
+  email: FormControl<string>;
+  password: FormControl<string>;
+}
+
+const form = new FormGroup<LoginForm>({ ... });
+const bridge = createFormBridge(form);
+
+// bridge.form is typed as FormGroup<LoginForm>
+bridge.form.controls.email; // FormControl<string> -- full autocompletion
+```
+
+## API Reference
+
+### Core Function
+
+| Function | Description |
+|----------|-------------|
+| `parseApiErrors(error, preset?, options?)` | Parse API errors without a form. Works in interceptors, stores, effects. Pass `{ debug: true }` to log warnings when no preset matches. |
+
+### FormBridge (form integration)
+
+Create with `provideFormBridge(form, config?)` (auto-cleanup via DestroyRef) or `createFormBridge(form, config?)` (manual `destroy()` required).
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `applyApiErrors(error)` | `ResolvedFieldError[]` | Parse and apply API errors to form controls |
+| `clearApiErrors()` | `void` | Remove all API-set errors |
+| `getFirstError()` | `FirstError \| null` | First error across all controls |
+| `getFieldErrors(field)` | `ValidationErrors \| null` | Errors for a specific field |
+| `addInterceptor(fn)` | `() => void` | Register an error interceptor. Returns a dispose function |
+| `destroy()` | `void` | Clean up internal subscriptions (not needed with `provideFormBridge`) |
+
+### Signals
+
+| Signal | Type | Description |
+|--------|------|-------------|
+| `errorsSignal` | `Signal<ResolvedFieldError[]>` | All current API errors |
+| `firstErrorSignal` | `Signal<FirstError \| null>` | First error, or null |
+| `hasErrorsSignal` | `Signal<boolean>` | Whether any API errors exist |
+
+### Standalone Utility Functions
+
+| Function | Description |
+|----------|-------------|
+| `wrapSubmit(form, source, options?)` | Submit lifecycle (disable/enable) without FormBridge |
+| `toFormData(data)` | Convert a plain object to FormData. Handles Files, Blobs, Arrays, nested objects |
+| `enableForm(form, options?)` | Enable all controls, with optional `except` list |
+| `disableForm(form, options?)` | Disable all controls, with optional `except` list |
+| `clearFormErrors(form)` | Clear all errors from all controls |
+| `getDirtyValues(form)` | Return only the dirty fields and their values |
+| `hasError(form, errorKey)` | Check if any control has a specific error |
+| `getErrorMessage(form, field, key?)` | Get the error message string for a field |
+
+### Deprecated (kept for backward compatibility)
+
+These FormBridge methods are deprecated. Use the standalone functions above instead.
+
+| Method | Replacement |
+|--------|-------------|
+| `handleSubmit(source)` | `wrapSubmit()` |
+| `setDefaultValues(values)` | `form.reset(values)` |
+| `reset()` | `form.reset()` + `bridge.clearApiErrors()` |
+| `enable(options?)` | `enableForm()` |
+| `disable(options?)` | `disableForm()` |
+| `toFormData(values?)` | `toFormData()` |
+| `checkDirty()` | `getDirtyValues()` or `form.dirty` |
+| `isDirtySignal` | `form.dirty` or `getDirtyValues()` |
+| `isSubmittingSignal` | Local `signal()` with `wrapSubmit()` |
+
+### Configuration
+
+```typescript
+interface FormBridgeConfig {
+  preset?: ErrorPreset | ErrorPreset[];
+  constraintMap?: Record<string, string>;
+  i18n?: {
+    prefix?: string;
+    resolver?: (field, constraint, message) => string | null;
+  };
+  catchAll?: boolean;     // Apply unmatched errors as { generic: msg }
+  mergeErrors?: boolean;  // Merge with existing errors instead of replacing
+  debug?: boolean;        // Log warnings when presets or fields don't match
+}
+```
+
 ## Debug Mode
 
-Set `debug: true` in the configuration to log warnings during development:
+Set `debug: true` to log warnings during development:
 
 ```typescript
 const bridge = createFormBridge(form, {
   preset: laravelPreset(),
   debug: true,
 });
-```
 
-The library will warn when:
-- No preset produces results for a given error payload (the format might be wrong or unsupported).
-- A parsed error field does not match any form control (possible typo or missing control).
-
-The standalone `parseApiErrors` also supports debug mode:
-
-```typescript
+// Or standalone:
 const errors = parseApiErrors(err.error, laravelPreset(), { debug: true });
 ```
 
-Disable debug in production builds.
+The library warns when:
+- No preset produces results for a given error payload (format might be wrong or unsupported)
+- A parsed error field does not match any form control (possible typo or missing control)
 
 ## Submit and Loading State
-
-### With FormBridge (deprecated)
-
-`handleSubmit()` is kept for backward compatibility but is deprecated in favor of standalone `wrapSubmit()`. It wraps an Observable and handles the full submit lifecycle: disabling the form, tracking loading state via `isSubmittingSignal`, and applying API errors on failure.
-
-```typescript
-onSubmit() {
-  this.bridge.handleSubmit(
-    this.http.post('/api/save', this.form.value)
-  ).subscribe({
-    next: () => this.router.navigate(['/success']),
-    error: () => {
-      // form is re-enabled, errors are applied automatically
-    },
-  });
-}
-```
-
-```html
-<button [disabled]="bridge.isSubmittingSignal()">
-  @if (bridge.isSubmittingSignal()) {
-    Sending...
-  } @else {
-    Submit
-  }
-</button>
-```
-
-By default, the error body is extracted using `err.error` (matching Angular's HttpErrorResponse). You can customize this:
-
-```typescript
-bridge.handleSubmit(source, {
-  extractError: (err) => (err as any).data.errors,
-});
-```
-
-### Without FormBridge
 
 `wrapSubmit` handles the disable/enable lifecycle as a standalone function:
 
@@ -366,7 +347,7 @@ wrapSubmit(this.form, this.http.post('/api', data), {
 
 ## i18n
 
-You can generate translation keys automatically by setting a prefix, or provide a custom resolver for full control.
+Generate translation keys automatically or provide a custom resolver:
 
 ```typescript
 // Translation key prefix
@@ -375,7 +356,6 @@ const bridge = createFormBridge(form, {
   i18n: { prefix: 'validation' }
 });
 // Produces keys like "validation.email.isEmail"
-// Use with ngx-translate, transloco, or any i18n library
 
 // Custom resolver
 const bridge = createFormBridge(form, {
@@ -389,7 +369,7 @@ const bridge = createFormBridge(form, {
 
 ## Error Interceptors
 
-Interceptors let you filter or transform errors before they reach the form.
+Interceptors let you filter or transform errors before they reach the form:
 
 ```typescript
 const dispose = bridge.addInterceptor((errors, form) => {
@@ -416,7 +396,7 @@ const dispose = bridge.addInterceptor((errors, form) => {
 
 ## Custom Preset
 
-If your backend uses a different format, you can write a preset in a few lines:
+If your backend uses a different format, write a preset in a few lines:
 
 ```typescript
 import { ErrorPreset, ApiFieldError } from 'ngx-api-forms';
@@ -434,32 +414,6 @@ export function myBackendPreset(): ErrorPreset {
     }
   };
 }
-```
-
-## Constraint Inference Limitations
-
-The Laravel, Django, and Zod presets infer constraint types (e.g. "required", "email") by pattern-matching on the English text of error messages. This works well with default backend messages but has known limitations:
-
-- **Translated messages**: If your backend returns messages in French, Spanish, or any non-English language, the inference will fall back to `'invalid'` for most constraints.
-- **Custom messages**: If you override default validation messages on the backend (e.g. `'Please provide your email'` instead of `'The email field is required'`), inference may not match.
-- **NestJS/class-validator does not have this limitation** because it transmits the constraint key directly (e.g. `isEmail`, `isNotEmpty`).
-
-When inference fails, you have several options:
-
-```typescript
-// Custom constraintMap to override specific mappings
-const bridge = createFormBridge(form, {
-  preset: laravelPreset(),
-  constraintMap: { 'mon_erreur_custom': 'required' },
-});
-
-// Use catchAll to apply all unmatched errors as { generic: msg }
-const bridge = createFormBridge(form, {
-  preset: laravelPreset(),
-  catchAll: true,
-});
-
-// Write a custom preset for full control
 ```
 
 ## Angular Compatibility

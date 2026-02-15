@@ -6,7 +6,7 @@
 export * from './lib/models/api-forms.models';
 
 // Core
-export { FormBridge, createFormBridge } from './lib/form-bridge/form-bridge';
+export { FormBridge, createFormBridge, provideFormBridge } from './lib/form-bridge/form-bridge';
 
 // Presets
 export {

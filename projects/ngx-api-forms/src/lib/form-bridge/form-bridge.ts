@@ -9,7 +9,7 @@
  * - SSR-safe operations
  * - FormData conversion utilities
  */
-import { signal, computed, Signal, WritableSignal } from '@angular/core';
+import { signal, computed, Signal, WritableSignal, inject, DestroyRef } from '@angular/core';
 import { FormGroup, FormArray, ValidationErrors, AbstractControl } from '@angular/forms';
 import { Observable, Subscription, tap, catchError } from 'rxjs';
 
@@ -92,10 +92,21 @@ export class FormBridge<T extends FormGroup = FormGroup> {
   /** Whether any API errors are currently applied */
   readonly hasErrorsSignal: Signal<boolean> = computed(() => this._apiErrors().length > 0);
 
-  /** Whether the form has been modified from its default values */
+  /**
+   * Whether the form has been modified from its default values.
+   *
+   * @deprecated Use the standalone `getDirtyValues()` function or Angular's
+   * built-in `form.dirty` for simpler dirty tracking. This signal will be
+   * removed in a future major version.
+   */
   readonly isDirtySignal: Signal<boolean> = this._isDirty.asReadonly();
 
-  /** Whether a submit operation is in progress */
+  /**
+   * Whether a submit operation is in progress.
+   *
+   * @deprecated Use `wrapSubmit()` with a local `signal()` for submit tracking.
+   * This signal is tied to the deprecated `handleSubmit()` method.
+   */
   readonly isSubmittingSignal: Signal<boolean> = this._isSubmitting.asReadonly();
 
   constructor(form: T, config?: FormBridgeConfig) {
@@ -295,6 +306,9 @@ export class FormBridge<T extends FormGroup = FormGroup> {
 
   /**
    * Set default values for the form and reset to them.
+   *
+   * @deprecated Use `form.reset(values)` directly. FormBridge should only
+   * handle API error mapping, not form state management.
    */
   setDefaultValues(values: Record<string, unknown>): void {
     for (const key of Object.keys(values)) {
@@ -307,6 +321,8 @@ export class FormBridge<T extends FormGroup = FormGroup> {
 
   /**
    * Reset the form to its default values and clear all errors.
+   *
+   * @deprecated Use `form.reset()` and `bridge.clearApiErrors()` directly.
    */
   reset(): void {
     this._form.reset(this._defaultValues);
@@ -316,6 +332,8 @@ export class FormBridge<T extends FormGroup = FormGroup> {
 
   /**
    * Enable all controls in the form.
+   *
+   * @deprecated Use the standalone `enableForm()` function instead.
    */
   enable(options?: EnableFormOptions): void {
     for (const key of Object.keys(this._form.controls)) {
@@ -327,6 +345,8 @@ export class FormBridge<T extends FormGroup = FormGroup> {
 
   /**
    * Disable all controls in the form.
+   *
+   * @deprecated Use the standalone `disableForm()` function instead.
    */
   disable(options?: DisableFormOptions): void {
     for (const key of Object.keys(this._form.controls)) {
@@ -337,6 +357,9 @@ export class FormBridge<T extends FormGroup = FormGroup> {
 
   /**
    * Check if the form values have changed compared to the defaults.
+   *
+   * @deprecated Use the standalone `getDirtyValues()` function or
+   * Angular's built-in `form.dirty`.
    */
   checkDirty(): boolean {
     this._computeDirty();
@@ -348,6 +371,8 @@ export class FormBridge<T extends FormGroup = FormGroup> {
   /**
    * Convert form values to FormData (for file uploads).
    * Delegates to the standalone `toFormData()` utility.
+   *
+   * @deprecated Use the standalone `toFormData()` function directly.
    */
   toFormData(values?: Record<string, unknown>): FormData {
     return toFormDataUtil(values ?? this._form.getRawValue());
@@ -386,7 +411,10 @@ export class FormBridge<T extends FormGroup = FormGroup> {
     const currentValues = this._form.getRawValue();
     let isDirty = false;
     for (const key of Object.keys(this._defaultValues)) {
-      if (currentValues[key] !== this._defaultValues[key]) {
+      const current = currentValues[key];
+      const stored = this._defaultValues[key];
+      // Deep comparison via JSON.stringify to handle objects, arrays, dates
+      if (current !== stored && JSON.stringify(current) !== JSON.stringify(stored)) {
         isDirty = true;
         break;
       }
@@ -503,4 +531,36 @@ export class FormBridge<T extends FormGroup = FormGroup> {
  */
 export function createFormBridge<T extends FormGroup = FormGroup>(form: T, config?: FormBridgeConfig): FormBridge<T> {
   return new FormBridge(form, config);
+}
+
+/**
+ * Create a FormBridge and register automatic cleanup via Angular's `DestroyRef`.
+ *
+ * Must be called in an injection context (constructor, field initializer, or
+ * inside `runInInjectionContext`). The bridge's internal subscriptions are
+ * cleaned up automatically when the component/service is destroyed - no need
+ * to call `destroy()` manually.
+ *
+ * @example
+ * ```typescript
+ * @Component({ ... })
+ * export class MyComponent {
+ *   private form = inject(FormBuilder).group({ email: [''] });
+ *   private bridge = provideFormBridge(this.form, {
+ *     preset: classValidatorPreset(),
+ *   });
+ *
+ *   onSubmit() {
+ *     this.http.post('/api', this.form.value).subscribe({
+ *       error: (err) => this.bridge.applyApiErrors(err.error),
+ *     });
+ *   }
+ * }
+ * ```
+ */
+export function provideFormBridge<T extends FormGroup = FormGroup>(form: T, config?: FormBridgeConfig): FormBridge<T> {
+  const bridge = new FormBridge(form, config);
+  const destroyRef = inject(DestroyRef);
+  destroyRef.onDestroy(() => bridge.destroy());
+  return bridge;
 }
