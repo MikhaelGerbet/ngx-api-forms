@@ -227,14 +227,6 @@ const bridge = provideFormBridge(form, {
 // 4. Write a custom preset for full control (see below)
 ```
 
-// 3. Disable inference entirely -- all errors get constraint 'serverError'
-const bridge = provideFormBridge(form, {
-  preset: laravelPreset({ noInference: true }),
-});
-
-// 4. Write a custom preset for full control (see below)
-```
-
 ## Global Errors
 
 Some backends return errors not tied to any specific field -- Django's `non_field_errors`, Zod's `formErrors`, or a field name that does not match any form control. These errors are collected in `globalErrorsSignal` instead of being silently dropped.

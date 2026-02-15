@@ -21,7 +21,8 @@ import { classValidatorPreset } from '../presets/class-validator.preset';
  *
  * @example
  * ```typescript
- * import { parseApiErrors, laravelPreset } from 'ngx-api-forms';
+ * import { parseApiErrors } from 'ngx-api-forms';
+ * import { laravelPreset } from 'ngx-api-forms/laravel';
  *
  * const errors = parseApiErrors(err.error, laravelPreset());
  * // [{ field: 'email', constraint: 'required', message: 'The email field is required.' }]
