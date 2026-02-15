@@ -9,6 +9,7 @@ import {
   djangoPreset,
   zodPreset,
   NgxFormErrorDirective,
+  ApiFieldError,
 } from 'ngx-api-forms';
 
 @Component({
@@ -280,8 +281,8 @@ export class App {
       this.interceptorDispose = null;
       this.interceptorActive.set(false);
     } else {
-      this.interceptorDispose = this.dirtyBridge.addInterceptor((errors) =>
-        errors.filter(e => e.field !== 'email')
+      this.interceptorDispose = this.dirtyBridge.addInterceptor((errors: ApiFieldError[]) =>
+        errors.filter((e: ApiFieldError) => e.field !== 'email')
       );
       this.interceptorActive.set(true);
     }
