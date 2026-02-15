@@ -734,4 +734,124 @@ describe('FormBridge', () => {
       expect(form.controls['email'].hasError('generic')).toBeTrue();
     });
   });
+
+  describe('form getter', () => {
+    it('should return the underlying FormGroup', () => {
+      const bridge = createFormBridge(form, { preset: classValidatorPreset() });
+      expect(bridge.form).toBe(form);
+    });
+  });
+
+  describe('getFieldErrors', () => {
+    it('should return ValidationErrors for a field with errors', () => {
+      const bridge = createFormBridge(form, { preset: laravelPreset() });
+      bridge.applyApiErrors({
+        message: 'validation failed',
+        errors: {
+          email: ['Email is required.', 'Email format is invalid.'],
+          name: ['Name is required.'],
+        },
+      });
+      const emailErrors = bridge.getFieldErrors('email');
+      expect(emailErrors).not.toBeNull();
+      // Laravel infers: 'is required' -> required, 'format is invalid' -> invalid
+      expect(emailErrors!['required']).toBe('Email is required.');
+      expect(emailErrors!['invalid']).toBe('Email format is invalid.');
+    });
+
+    it('should return null when field has no errors', () => {
+      const bridge = createFormBridge(form, { preset: classValidatorPreset() });
+      expect(bridge.getFieldErrors('password')).toBeNull();
+    });
+  });
+
+  describe('multiple interceptors ordering', () => {
+    it('should apply interceptors in registration order', () => {
+      const bridge = createFormBridge(form, { preset: classValidatorPreset() });
+
+      bridge.addInterceptor(errors => errors.map(e => ({ ...e, message: e.message + ' [A]' })));
+      bridge.addInterceptor(errors => errors.map(e => ({ ...e, message: e.message + ' [B]' })));
+
+      bridge.applyApiErrors({
+        message: [
+          { property: 'email', constraints: { isEmail: 'bad' } },
+        ],
+      });
+
+      const resolved = bridge.errorsSignal().filter(e => e.field === 'email');
+      expect(resolved.length).toBe(1);
+      expect(resolved[0].message).toBe('bad [A] [B]');
+    });
+
+    it('should allow partial disposal of interceptors', () => {
+      const bridge = createFormBridge(form, { preset: classValidatorPreset() });
+
+      const disposeA = bridge.addInterceptor(errors =>
+        errors.map(e => ({ ...e, message: e.message + ' [A]' }))
+      );
+      bridge.addInterceptor(errors =>
+        errors.map(e => ({ ...e, message: e.message + ' [B]' }))
+      );
+
+      disposeA();
+
+      bridge.applyApiErrors({
+        message: [
+          { property: 'email', constraints: { isEmail: 'bad' } },
+        ],
+      });
+
+      const resolved = bridge.errorsSignal().filter(e => e.field === 'email');
+      expect(resolved[0].message).toBe('bad [B]');
+    });
+  });
+
+  describe('Zod wrapped format (errors.fieldErrors)', () => {
+    it('should parse { errors: { fieldErrors: ... } } format', () => {
+      const bridge = createFormBridge(form, { preset: zodPreset() });
+      const result = bridge.applyApiErrors({
+        errors: {
+          fieldErrors: {
+            email: ['Invalid email address'],
+            name: ['Too short'],
+          },
+        },
+      });
+      expect(result.length).toBe(2);
+      // Zod infers: 'email' in message -> email, 'Too short' -> invalid
+      expect(form.controls['email'].hasError('email')).toBeTrue();
+      expect(form.controls['name'].hasError('invalid')).toBeTrue();
+    });
+  });
+
+  describe('setDefaultValues resilience', () => {
+    it('should ignore keys that do not exist in the form', () => {
+      const bridge = createFormBridge(form, { preset: classValidatorPreset() });
+      expect(() => {
+        bridge.setDefaultValues({ email: 'a@b.com', nonExistent: 'ignored' } as any);
+      }).not.toThrow();
+      expect(form.controls['email'].value).toBe('a@b.com');
+    });
+  });
+
+  describe('i18n resolver returning null', () => {
+    it('should fallback to original message when resolver returns null', () => {
+      const bridge = createFormBridge(form, {
+        preset: classValidatorPreset(),
+        i18n: {
+          resolver: () => null,
+        },
+      });
+
+      bridge.applyApiErrors({
+        message: [
+          { property: 'email', constraints: { isEmail: 'email must be valid' } },
+        ],
+      });
+
+      const resolved = bridge.errorsSignal().filter(e => e.field === 'email');
+      expect(resolved.length).toBe(1);
+      expect(resolved[0].message).toBe('email must be valid');
+    });
+  });
 });

@@ -182,7 +182,7 @@ const bridge = createFormBridge(form, {
 | `errorsSignal` | `Signal<ResolvedFieldError[]>` | All current API errors |
 | `firstErrorSignal` | `Signal<FirstError \| null>` | First error, or null |
 | `hasErrorsSignal` | `Signal<boolean>` | Whether any API errors exist |
-| `isDirtySignal` | `Signal<boolean>` | Whether form changed from defaults |
+| `isDirtySignal` | `Signal<boolean>` | Whether form changed from defaults (updates reactively on every value change) |
 | `isSubmittingSignal` | `Signal<boolean>` | Whether a submit is in progress (via handleSubmit) |
 
 ### Configuration

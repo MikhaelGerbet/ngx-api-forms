@@ -73,6 +73,19 @@ export class App {
     preset: classValidatorPreset(),
   });
 
+  // ---- Dirty State & Interceptors Demo ----
+  dirtyForm = this.fb.group({
+    email: ['user@test.com'],
+    name: ['John'],
+  });
+
+  dirtyBridge = createFormBridge(this.dirtyForm, {
+    preset: classValidatorPreset(),
+  });
+
+  interceptorActive = signal(false);
+  private interceptorDispose: (() => void) | null = null;
+
   customJson = signal<string>(JSON.stringify({
     statusCode: 400,
     message: [
@@ -257,6 +270,32 @@ export class App {
   clearCustom(): void {
     this.customJsonBridge.clearApiErrors();
     this.customResult.set('');
+  }
+
+  // ---- Dirty & Interceptor Demo ----
+
+  toggleInterceptor(): void {
+    if (this.interceptorDispose) {
+      this.interceptorDispose();
+      this.interceptorDispose = null;
+      this.interceptorActive.set(false);
+    } else {
+      this.interceptorDispose = this.dirtyBridge.addInterceptor((errors) =>
+        errors.filter(e => e.field !== 'email')
+      );
+      this.interceptorActive.set(true);
+    }
+  }
+
+  applyDirtyErrors(): void {
+    const apiError = {
+      statusCode: 400,
+      message: [
+        { property: 'email', constraints: { isEmail: 'email must be a valid email' } },
+        { property: 'name', constraints: { isNotEmpty: 'name should not be empty' } },
+      ],
+    };
+    this.dirtyBridge.applyApiErrors(apiError);
   }
 
   // ---- Utils ----

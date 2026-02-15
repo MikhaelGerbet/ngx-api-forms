@@ -356,6 +356,79 @@ simulateApiError(): void &#123;
       </div>
     </section>
 
+    <!-- Dirty State & Interceptors Demo -->
+    <section class="demo-section dirty-demo">
+      <h2>Dirty State & Interceptors</h2>
+      <p>The <code>isDirtySignal</code> updates reactively when form values change. Interceptors can filter or transform errors before they reach the form, and return a dispose function.</p>
+
+      <div class="demo-layout">
+        <div class="demo-form-side">
+          <h3>Dirty Tracking</h3>
+          <form [formGroup]="dirtyForm" class="sample-form">
+            <div class="form-field">
+              <label for="dirty-email">Email (default: user&#64;test.com)</label>
+              <input id="dirty-email" type="email" formControlName="email">
+            </div>
+            <div class="form-field">
+              <label for="dirty-name">Name (default: John)</label>
+              <input id="dirty-name" type="text" formControlName="name">
+            </div>
+          </form>
+
+          <div class="demo-controls">
+            <div class="demo-buttons">
+              <button class="btn btn-secondary" (click)="dirtyBridge.reset()">Reset to Defaults</button>
+              <button class="btn btn-ghost" (click)="toggleInterceptor()">
+                {{ interceptorActive() ? 'Remove Interceptor' : 'Add Interceptor (filter email)' }}
+              </button>
+              <button class="btn btn-primary" (click)="applyDirtyErrors()">Apply Errors</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="demo-result-side">
+          <h3>State</h3>
+          <div class="signals-panel">
+            <div class="signal-row">
+              <span class="signal-label">isDirty:</span>
+              <span class="signal-value" [class.active]="dirtyBridge.isDirtySignal()">{{ dirtyBridge.isDirtySignal() }}</span>
+            </div>
+            <div class="signal-row">
+              <span class="signal-label">hasErrors:</span>
+              <span class="signal-value" [class.active]="dirtyBridge.hasErrorsSignal()">{{ dirtyBridge.hasErrorsSignal() }}</span>
+            </div>
+            <div class="signal-row">
+              <span class="signal-label">interceptor active:</span>
+              <span class="signal-value" [class.active]="interceptorActive()">{{ interceptorActive() }}</span>
+            </div>
+          </div>
+
+          <div class="info-box">
+            <p><code>isDirtySignal</code> updates automatically on every value change - no manual <code>checkDirty()</code> call needed.</p>
+            <p>When the interceptor is active, email errors are filtered out. Use the dispose function to remove it.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="code-tabs">
+        <h3>Implementation</h3>
+        <div class="code-block">
+          <div class="code-header">
+            <span>component.ts</span>
+            <button class="copy-btn" (click)="copyToClipboard('// isDirtySignal is reactive - no manual call needed\ntemplate: `{{ bridge.isDirtySignal() }}`\n\n// Interceptors return a dispose function\nconst dispose = bridge.addInterceptor((errors) =>\n  errors.filter(e => e.field !== \'email\')\n);\n// Later: dispose() to remove the interceptor')">Copy</button>
+          </div>
+          <pre><code>// isDirtySignal is reactive - no manual call needed
+template: `&#123;&#123; bridge.isDirtySignal() &#125;&#125;`
+
+// Interceptors return a dispose function
+const dispose = bridge.addInterceptor((errors) =&gt;
+  errors.filter(e =&gt; e.field !== 'email')
+);
+// Later: dispose() to remove the interceptor</code></pre>
+        </div>
+      </div>
+    </section>
+
     <!-- Custom JSON Demo -->
     <section class="demo-section custom-demo">
       <h2>Custom Error Payload</h2>
@@ -516,7 +589,9 @@ export class MyComponent &#123;
             <tr><td><code>enable(options?)</code></td><td><code>void</code></td><td>Enable controls (with exceptions)</td></tr>
             <tr><td><code>disable(options?)</code></td><td><code>void</code></td><td>Disable controls (with exceptions)</td></tr>
             <tr><td><code>toFormData()</code></td><td><code>FormData</code></td><td>Convert form values to FormData</td></tr>
-            <tr><td><code>addInterceptor(fn)</code></td><td><code>void</code></td><td>Register an error interceptor</td></tr>
+            <tr><td><code>addInterceptor(fn)</code></td><td><code>() =&gt; void</code></td><td>Register an error interceptor, returns a dispose function</td></tr>
+            <tr><td><code>checkDirty()</code></td><td><code>boolean</code></td><td>Check if form differs from defaults</td></tr>
+            <tr><td><code>destroy()</code></td><td><code>void</code></td><td>Clean up internal subscriptions</td></tr>
           </tbody>
         </table>
       </div>
